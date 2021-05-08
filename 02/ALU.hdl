@@ -60,10 +60,11 @@ CHIP ALU {
     Mux16(a=xandy, b=xplusy, sel=f, out=res);
 
     // Select between result and its negation based on no
+    // Also output ng based on MSB of output
     Not16(in=res, out=notres);
     Mux16(a=res, b=notres, sel=no, out=out, out[0..7]=firsthalf, out[8..15]=lasthalf, out[15]=ng);
 
-    // zr and ng
+    // zr
     Or8Way(in=firsthalf, out=firstor);
     Or8Way(in=lasthalf, out=lastor);
     Or(a=firstor, b=lastor, out=notzr);
