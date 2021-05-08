@@ -42,5 +42,30 @@ CHIP ALU {
         ng; // 1 if (out < 0),  0 otherwise
 
     PARTS:
-   // Put you code here:
+    // Put your code here:
+
+    // Select between inputs and zeros based on zx and zy
+    Mux16(a=x, b[0..15]=false, sel=zx, out=zerox);
+    Mux16(a=y, b[0..15]=false, sel=zy, out=zeroy);
+
+    // Select between inputs and their negations based on nx and ny
+    Not16(in=zerox, out=notx);
+    Not16(in=zeroy, out=noty);
+    Mux16(a=zerox, b=notx, sel=nx, out=negx);
+    Mux16(a=zeroy, b=noty, sel=ny, out=negy);
+
+    // Select between adding and anding based on f
+    Add16(a=negx, b=negy, out=xplusy);
+    And16(a=negx, b=negy, out=xandy);
+    Mux16(a=xandy, b=xplusy, sel=f, out=res);
+
+    // Select between result and its negation based on no
+    Not16(in=res, out=notres);
+    Mux16(a=res, b=notres, sel=no, out=out, out[0..7]=firsthalf, out[8..15]=lasthalf, out[15]=ng);
+
+    // zr and ng
+    Or8Way(in=firsthalf, out=firstor);
+    Or8Way(in=lasthalf, out=lastor);
+    Or(a=firstor, b=lastor, out=notzr);
+    Not(in=notzr, out=zr);
 }
