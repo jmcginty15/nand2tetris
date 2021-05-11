@@ -17,4 +17,21 @@ CHIP PC {
 
     PARTS:
     // Put your code here:
+    Inc16(in=feedback, out=feedbackinc);
+
+    Not(in=reset, out=notreset);
+    And(a=load, b=notreset, out=loadonly);
+
+    Not(in=load, out=notload);
+    And(a=notreset, b=notload, out=neither);
+    And(a=neither, b=inc, out=inconly);
+
+    Mux16(a=feedback, b[0..15]=false, sel=reset, out=resetout);
+    Mux16(a=resetout, b=in, sel=loadonly, out=loadout);
+    Mux16(a=loadout, b=feedbackinc, sel=inconly, out=incout);
+
+    Or(a=load, b=inc, out=loadorinc);
+    Or(a=loadorinc, b=reset, out=finalload);
+    
+    Register(in=incout, load=finalload, out=out, out=feedback);
 }
