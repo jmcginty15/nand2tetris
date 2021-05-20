@@ -2,6 +2,35 @@ const fs = require('fs');
 const process = require('process');
 assemble(process.argv[2]);
 
+// storage for symbols
+const symbols = {
+    SP: 0,
+    LCL: 1,
+    ARG: 2,
+    THIS: 3,
+    THAT: 4,
+    R0: 0,
+    R1: 1,
+    R2: 2,
+    R3: 3,
+    R4: 4,
+    R5: 5,
+    R6: 6,
+    R7: 7,
+    R8: 8,
+    R9: 9,
+    R10: 10,
+    R11: 11,
+    R12: 12,
+    R13: 13,
+    R14: 14,
+    R15: 15,
+    SCREEN: 16384,
+    KBD: 24576
+};
+let ROMLocation = 0;
+let RAMLocation = 16;
+
 // assembler function
 function assemble(path) {
     fs.readFile(path, 'utf8', function (err, asmFile) {
@@ -12,22 +41,29 @@ function assemble(path) {
 
         const program = asmFile.split(/\r?\n/);
         const commands = [];
-        for (let line of program) {
+
+        // first pass: allocate ROM symbols
+        for (let i = 0; i < program.length; i++) {
             // remove leading whitespace
-            while (line.charAt(0) == ' ') line = line.slice(1);
+            while (program[i].charAt(0) == ' ') program[i] = program[i].slice(1);
             // remove any trailing comments from the command
-            const commentIndex = line.indexOf('//');
-            if (commentIndex !== -1) line = line.slice(0, commentIndex);
+            const commentIndex = program[i].indexOf('//');
+            if (commentIndex !== -1) program[i] = program[i].slice(0, commentIndex);
             // remove trailing whitespace
-            while (line.slice(-1) == ' ') line = line.slice(0, -1);
+            while (program[i].slice(-1) == ' ') program[i] = program[i].slice(0, -1);
+            // parse command if it is not an empty line
+            if (program[i] !== '') parse(program[i], false);
+        }
+
+        for (let line of program) {
             // parse command if it is not an empty line
             if (line !== '') {
-                const command = parse(line);
+                const command = parse(line, true);
                 if (command) commands.push(command);
             }
         }
-        const hackFile = commands.join('\n');
 
+        const hackFile = commands.join('\n');
         const outputPath = path.slice(0, -4);
         fs.writeFile(`${outputPath}.hack`, hackFile, function (err) {
             if (err) {
@@ -40,23 +76,22 @@ function assemble(path) {
 }
 
 // command parse function
-function parse(command) {
+function parse(command, parse) {
     let commandType = 1;
     if (command.charAt(0) == '@') commandType = 0;
     else if (command.charAt(0) == '(' && command.slice(-1) == ')') commandType = 2;
 
     let binaryCommand = null;
-    switch (commandType) {
+    if (parse) switch (commandType) {
         case 0:
             binaryCommand = parseACommand(command);
             break;
         case 1:
             binaryCommand = parseCCommand(command);
             break;
-        case 2:
-            binaryCommand = parseLCommand(command);
-            break;
     }
+    else if (commandType === 2) parseLCommand(command);
+    else ROMLocation++;
 
     return binaryCommand;
 }
@@ -68,7 +103,15 @@ function parseACommand(command) {
 
     // parse numeric value to binary string
     function binaryString(value) {
-        const intVal = parseInt(value);
+        let intVal = isNaN(value) ? null : parseInt(value);
+        if (intVal === null) {
+            if (value in symbols) intVal = symbols[value];
+            else {
+                symbols[value] = RAMLocation;
+                intVal = RAMLocation;
+                RAMLocation++;
+            }
+        }
         let binaryVal = (intVal >>> 0).toString(2);
         while (binaryVal.length < 15) binaryVal = `0${binaryVal}`;
         return binaryVal;
@@ -201,5 +244,6 @@ function parseCCommand(command) {
 
 // L command parse function
 function parseLCommand(command) {
-    return null;
+    const symbol = command.slice(1, -1);
+    symbols[symbol] = ROMLocation;
 }
