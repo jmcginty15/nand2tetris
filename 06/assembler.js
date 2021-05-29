@@ -45,12 +45,12 @@ function assemble(path) {
         // first pass: allocate ROM symbols
         for (let i = 0; i < program.length; i++) {
             // remove leading whitespace
-            while (program[i].charAt(0) == ' ') program[i] = program[i].slice(1);
+            while (program[i].charAt(0) === ' ') program[i] = program[i].slice(1);
             // remove any trailing comments from the command
             const commentIndex = program[i].indexOf('//');
             if (commentIndex !== -1) program[i] = program[i].slice(0, commentIndex);
             // remove trailing whitespace
-            while (program[i].slice(-1) == ' ') program[i] = program[i].slice(0, -1);
+            while (program[i].slice(-1) === ' ') program[i] = program[i].slice(0, -1);
             // parse command if it is not an empty line
             if (program[i] !== '') parse(program[i], false);
         }
@@ -78,8 +78,8 @@ function assemble(path) {
 // command parse function
 function parse(command, parse) {
     let commandType = 1;
-    if (command.charAt(0) == '@') commandType = 0;
-    else if (command.charAt(0) == '(' && command.slice(-1) == ')') commandType = 2;
+    if (command.charAt(0) === '@') commandType = 0;
+    else if (command.charAt(0) === '(' && command.slice(-1) === ')') commandType = 2;
 
     let binaryCommand = null;
     if (parse) switch (commandType) {
