@@ -220,8 +220,9 @@ function parseMemoryAccessCommand(command, segment, index) {
             if (segment === 'constant') {
                 commandSet += `@returnAddress${returnAddressIndex}\nD=A\n@R13\nM=D\n@${index}\nD=A\n@pushToStack\n0;JMP\n(returnAddress${returnAddressIndex})`;
                 returnAddressIndex++;
-            } else if (segment === 'temp') {
-                const a = 5 + parseInt(index);
+            } else if (segment === 'temp' || segment === 'pointer') {
+                const baseIndex = segment === 'temp' ? 5 : 3;
+                const a = baseIndex + parseInt(index);
                 commandSet += `@returnAddress${returnAddressIndex}\nD=A\n@R13\nM=D\n@${a}\nD=M\n@pushToStack\n0;JMP\n(returnAddress${returnAddressIndex})`;
                 returnAddressIndex++;
             } else {
@@ -248,8 +249,9 @@ function parseMemoryAccessCommand(command, segment, index) {
                 subroutinesAdded.popFromStack = true;
             }
 
-            if (segment === 'temp') {
-                const a = 5 + parseInt(index);
+            if (segment === 'temp' || segment === 'pointer') {
+                const baseIndex = segment === 'temp' ? 5 : 3;
+                const a = baseIndex + parseInt(index);
                 commandSet += `@returnAddress${returnAddressIndex}\nD=A\n@R13\nM=D\n@${a}\nD=A\n@R14\nM=D\n@popFromStack\n0;JMP\n(returnAddress${returnAddressIndex})\n@R14\nA=M\nM=D`;
                 returnAddressIndex++;
             } else {
