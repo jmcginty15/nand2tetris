@@ -138,7 +138,7 @@ function parseArithmeticCommand(command) {
             commandSet += subroutines.popFromStack;
             subroutinesAdded.popFromStack = true;
         }
-        
+
         switch (command) {
             case 'add':
                 if (!subroutinesAdded.add) {
@@ -158,7 +158,7 @@ function parseArithmeticCommand(command) {
                 commandSet += `@returnAddress${returnAddressIndex}\nD=A\n@R14\nM=D\n@sub\n0;JMP\n(returnAddress${returnAddressIndex})`;
                 returnAddressIndex++;
                 return commandSet;
-                            case 'eq':
+            case 'eq':
                 if (!subroutinesAdded.eq) {
                     commandSet += subroutines.eq;
                     subroutinesAdded.eq = true;
@@ -208,44 +208,69 @@ function parseArithmeticCommand(command) {
 }
 
 function parseMemoryAccessCommand(command, segment, index) {
+    let commandSet = '';
+
     switch (command) {
         case 'push':
-            let commandSet = '';
             if (!subroutinesAdded.pushToStack) {
                 commandSet += subroutines.pushToStack;
                 subroutinesAdded.pushToStack = true;
             }
 
-            switch (segment) {
-                case 'argument':
-                    console.log(segment);
-                    break;
-                case 'local':
-                    console.log(segment);
-                    break;
-                case 'static':
-                    console.log(segment);
-                    break;
-                case 'constant':
-                    commandSet += `@returnAddress${returnAddressIndex}\nD=A\n@R13\nM=D\n@${index}\nD=A\n@pushToStack\n0;JMP\n(returnAddress${returnAddressIndex})`;
-                    returnAddressIndex++;
-                    return commandSet;
-                case 'this':
-                    console.log(segment);
-                    break;
-                case 'that':
-                    console.log(segment);
-                    break;
-                case 'pointer':
-                    console.log(segment);
-                    break;
-                case 'temp':
-                    console.log(segment);
-                    break;
+            if (segment === 'constant') {
+                commandSet += `@returnAddress${returnAddressIndex}\nD=A\n@R13\nM=D\n@${index}\nD=A\n@pushToStack\n0;JMP\n(returnAddress${returnAddressIndex})`;
+                returnAddressIndex++;
+            } else if (segment === 'temp') {
+                const a = 5 + parseInt(index);
+                commandSet += `@returnAddress${returnAddressIndex}\nD=A\n@R13\nM=D\n@${a}\nD=M\n@pushToStack\n0;JMP\n(returnAddress${returnAddressIndex})`;
+                returnAddressIndex++;
+            } else {
+                switch (segment) {
+                    case 'local':
+                        segmentSymbol = 'LCL';
+                        break;
+                    case 'argument':
+                        segmentSymbol = 'ARG';
+                        break;
+                    default:
+                        segmentSymbol = segment.toUpperCase();
+                        break;
+                }
+
+                commandSet += `@returnAddress${returnAddressIndex}\nD=A\n@R13\nM=D\n@${index}\nD=A\n@${segmentSymbol}\nA=D+M\nD=M\n@pushToStack\n0;JMP\n(returnAddress${returnAddressIndex})`;
+                returnAddressIndex++;
             }
+
+            return commandSet;
         case 'pop':
-            console.log(segment, index);
-            break;
+            if (!subroutinesAdded.popFromStack) {
+                commandSet += subroutines.popFromStack;
+                subroutinesAdded.popFromStack = true;
+            }
+
+            if (segment === 'temp') {
+                const a = 5 + parseInt(index);
+                commandSet += `@returnAddress${returnAddressIndex}\nD=A\n@R13\nM=D\n@${a}\nD=A\n@R14\nM=D\n@popFromStack\n0;JMP\n(returnAddress${returnAddressIndex})\n@R14\nA=M\nM=D`;
+                returnAddressIndex++;
+            } else {
+                let segmentSymbol = '';
+                switch (segment) {
+                    case 'local':
+                        segmentSymbol = 'LCL';
+                        break;
+                    case 'argument':
+                        segmentSymbol = 'ARG';
+                        break;
+                    default:
+                        segmentSymbol = segment.toUpperCase();
+                        break;
+                }
+
+                commandSet += `@returnAddress${returnAddressIndex}\nD=A\n@R13\nM=D\n@${index}\nD=A\n@${segmentSymbol}\nD=D+M\n@R14\nM=D\n@popFromStack\n0;JMP\n(returnAddress${returnAddressIndex})\n@R14\nA=M\nM=D`;
+                returnAddressIndex++;
+            }
+
+            return commandSet;
     }
 }
 
