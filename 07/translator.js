@@ -95,6 +95,11 @@ const memoryAccessKeywords = [
     'push',
     'pop'
 ];
+const commonSegments = [
+    'temp',
+    'pointer',
+    'static'
+];
 
 function parse(command) {
     if (arithmeticKeywords.includes(command.toLowerCase())) return parseArithmeticCommand(command);
@@ -220,8 +225,19 @@ function parseMemoryAccessCommand(command, segment, index) {
             if (segment === 'constant') {
                 commandSet += `@returnAddress${returnAddressIndex}\nD=A\n@R13\nM=D\n@${index}\nD=A\n@pushToStack\n0;JMP\n(returnAddress${returnAddressIndex})`;
                 returnAddressIndex++;
-            } else if (segment === 'temp' || segment === 'pointer') {
-                const baseIndex = segment === 'temp' ? 5 : 3;
+            } else if (commonSegments.includes(segment)) {
+                let baseIndex = null;
+                switch (segment) {
+                    case 'pointer':
+                        baseIndex = 3;
+                        break;
+                    case 'temp':
+                        baseIndex = 5;
+                        break;
+                    case 'static':
+                        baseIndex = 16;
+                        break;
+                }
                 const a = baseIndex + parseInt(index);
                 commandSet += `@returnAddress${returnAddressIndex}\nD=A\n@R13\nM=D\n@${a}\nD=M\n@pushToStack\n0;JMP\n(returnAddress${returnAddressIndex})`;
                 returnAddressIndex++;
@@ -249,8 +265,19 @@ function parseMemoryAccessCommand(command, segment, index) {
                 subroutinesAdded.popFromStack = true;
             }
 
-            if (segment === 'temp' || segment === 'pointer') {
-                const baseIndex = segment === 'temp' ? 5 : 3;
+            if (commonSegments.includes(segment)) {
+                let baseIndex = null;
+                switch (segment) {
+                    case 'pointer':
+                        baseIndex = 3;
+                        break;
+                    case 'temp':
+                        baseIndex = 5;
+                        break;
+                    case 'static':
+                        baseIndex = 16;
+                        break;
+                }
                 const a = baseIndex + parseInt(index);
                 commandSet += `@returnAddress${returnAddressIndex}\nD=A\n@R13\nM=D\n@${a}\nD=A\n@R14\nM=D\n@popFromStack\n0;JMP\n(returnAddress${returnAddressIndex})\n@R14\nA=M\nM=D`;
                 returnAddressIndex++;
