@@ -1,48 +1,22 @@
 const fs = require('fs');
 const process = require('process');
-translate(process.argv[2]);
+const files = [];
 
-function translate(path) {
+function translate(path, topLevel) {
+    let outputPath = '';
     const dotIndex = path.indexOf('.');
-    if (dotIndex === -1) fs.readdir(path, 'utf-8', function (err, files) {
-        if (err) {
-            console.error(err);
-            process.exit(1);
-        }
+    if (dotIndex === -1) {
+        const lastSlash = path.lastIndexOf('/');
+        outputPath = `${path}/${path.slice(lastSlash)}`;
+        const files = fs.readdirSync(path, 'utf-8');
+        for (let index in files) translate(`${path}/${files[index]}`, false);
+    } else if (path.slice(dotIndex) === '.vm') {
+        outputPath = path.slice(0, dotIndex);
+        parseFile(path);
+    }
 
-        for (let index in files) translate(`${path}/${files[index]}`);
-    });
-    else if (path.slice(dotIndex) === '.vm') parseFile(path);
-}
-
-function parseFile(path) {
-    fs.readFile(path, 'utf-8', function (err, vmFile) {
-        if (err) {
-            console.error(err);
-            process.exit(1);
-        }
-
-        const program = vmFile.split(/\r?\n/);
-        const commands = [];
-
-        for (let command of program) {
-            // remove leading whitespace
-            while (command.charAt(0) === ' ') command = command.slice(1);
-            // remove any trailing comments from the command
-            const commentIndex = command.indexOf('//');
-            if (commentIndex !== -1) command = command.slice(0, commentIndex);
-            // remove trailing whitespace
-            while (command.slice(-1) === ' ') command = command.slice(0, -1);
-            // parse command if it is not an empty line
-            if (command !== '') {
-                const nextCommand = parse(command);
-                commands.push(nextCommand);
-            }
-        }
-        commands.push('(terminationLoop)\n@terminationLoop\n0;JMP');
-
-        const asmFile = commands.join('\n');
-        const outputPath = path.slice(0, -3);
+    const asmFile = files.join('\n');
+    if (topLevel) {
         fs.writeFile(`${outputPath}.asm`, asmFile, function (err) {
             if (err) {
                 console.error(err);
@@ -50,10 +24,37 @@ function parseFile(path) {
             }
             console.log('translation successful');
         });
-    });
+    }
+}
+
+function parseFile(path) {
+    const vmFile = fs.readFileSync(path, 'utf-8');
+    const program = vmFile.split(/\r?\n/);
+    const commands = [];
+    // const fileName = path.slice(path.lastIndexOf('/') + 1, -3);
+
+    for (let command of program) {
+        // remove leading whitespace
+        while (command.charAt(0) === ' ') command = command.slice(1);
+        // remove any trailing comments from the command
+        const commentIndex = command.indexOf('//');
+        if (commentIndex !== -1) command = command.slice(0, commentIndex);
+        // remove trailing whitespace
+        while (command.slice(-1) === ' ') command = command.slice(0, -1);
+        // parse command if it is not an empty line
+        if (command !== '') {
+            const nextCommand = parse(command);
+            commands.push(nextCommand);
+        }
+    }
+    commands.push('(terminationLoop)\n@terminationLoop\n0;JMP');
+
+    const asmFile = commands.join('\n');
+    files.push(asmFile);
 }
 
 let returnAddressIndex = 12;
+let currentFunctionName = null;
 const subroutinesAdded = {
     pushToStack: false,
     popFromStack: false,
@@ -73,9 +74,9 @@ const subroutines = {
     add: '@endAdd\n0;JMP\n(add)\n@returnAddress0\nD=A\n@R13\nM=D\n@popFromStack\n0;JMP\n(returnAddress0)\n@SP\nM=M-1\nA=M\nM=D+M\n@SP\nM=M+1\n@R14\nA=M\n0;JMP\n(endAdd)\n',
     sub: '@endSub\n0;JMP\n(sub)\n@returnAddress1\nD=A\n@R13\nM=D\n@popFromStack\n0;JMP\n(returnAddress1)\n@SP\nM=M-1\nA=M\nM=M-D\n@SP\nM=M+1\n@R14\nA=M\n0;JMP\n(endSub)\n',
     neg: '@endNeg\n0;JMP\n(neg)\n@returnAddress2\nD=A\n@R13\nM=D\n@popFromStack\n0;JMP\n(returnAddress2)\n@SP\nA=M\nM=-D\n@SP\nM=M+1\n@R14\nA=M\n0;JMP\n(endNeg)\n',
-    eq: '@endEq\n0;JMP\n(eq)\n@returnAddress3\nD=A\n@R13\nM=D\n@popFromStack\n0;JMP\n(returnAddress3)\n@R15\nM=D\n@returnAddress4\nD=A\n@R13\nM=D\n@R15\nD=M\n@SP\nM=M-1\nA=M\nD=M-D\n@equals\nD;JEQ\nD=0\n@enterResult\n0;JMP\n(equals)\nD=-1\n(enterResult)\n@pushToStack\n0;JMP\n(returnAddress4)\n@R14\nA=M\n0;JMP\n(endEq)\n',
-    gt: '@endGt\n0;JMP\n(gt)\n@returnAddress5\nD=A\n@R13\nM=D\n@popFromStack\n0;JMP\n(returnAddress5)\n@R15\nM=D\n@returnAddress6\nD=A\n@R13\nM=D\n@R15\nD=M\n@SP\nM=M-1\nA=M\nD=M-D\n@equals\nD;JGT\nD=0\n@enterResult\n0;JMP\n(equals)\nD=-1\n(enterResult)\n@pushToStack\n0;JMP\n(returnAddress6)\n@R14\nA=M\n0;JMP\n(endGt)\n',
-    lt: '@endLt\n0;JMP\n(lt)\n@returnAddress7\nD=A\n@R13\nM=D\n@popFromStack\n0;JMP\n(returnAddress7)\n@R15\nM=D\n@returnAddress8\nD=A\n@R13\nM=D\n@R15\nD=M\n@SP\nM=M-1\nA=M\nD=M-D\n@equals\nD;JLT\nD=0\n@enterResult\n0;JMP\n(equals)\nD=-1\n(enterResult)\n@pushToStack\n0;JMP\n(returnAddress8)\n@R14\nA=M\n0;JMP\n(endLt)\n',
+    eq: '@endEq\n0;JMP\n(eq)\n@returnAddress3\nD=A\n@R13\nM=D\n@popFromStack\n0;JMP\n(returnAddress3)\n@R15\nM=D\n@returnAddress4\nD=A\n@R13\nM=D\n@R15\nD=M\n@SP\nM=M-1\nA=M\nD=M-D\n@equals\nD;JEQ\nD=0\n@enterResult1\n0;JMP\n(equals)\nD=-1\n(enterResult1)\n@pushToStack\n0;JMP\n(returnAddress4)\n@R14\nA=M\n0;JMP\n(endEq)\n',
+    gt: '@endGt\n0;JMP\n(gt)\n@returnAddress5\nD=A\n@R13\nM=D\n@popFromStack\n0;JMP\n(returnAddress5)\n@R15\nM=D\n@returnAddress6\nD=A\n@R13\nM=D\n@R15\nD=M\n@SP\nM=M-1\nA=M\nD=M-D\n@equals\nD;JGT\nD=0\n@enterResult2\n0;JMP\n(equals)\nD=-1\n(enterResult2)\n@pushToStack\n0;JMP\n(returnAddress6)\n@R14\nA=M\n0;JMP\n(endGt)\n',
+    lt: '@endLt\n0;JMP\n(lt)\n@returnAddress7\nD=A\n@R13\nM=D\n@popFromStack\n0;JMP\n(returnAddress7)\n@R15\nM=D\n@returnAddress8\nD=A\n@R13\nM=D\n@R15\nD=M\n@SP\nM=M-1\nA=M\nD=M-D\n@equals\nD;JLT\nD=0\n@enterResult3\n0;JMP\n(equals)\nD=-1\n(enterResult3)\n@pushToStack\n0;JMP\n(returnAddress8)\n@R14\nA=M\n0;JMP\n(endLt)\n',
     and: '@endAnd\n0;JMP\n(and)\n@returnAddress9\nD=A\n@R13\nM=D\n@popFromStack\n0;JMP\n(returnAddress9)\n@SP\nM=M-1\nA=M\nM=D&M\n@SP\nM=M+1\n@R14\nA=M\n0;JMP\n(endAnd)\n',
     or: '@endOr\n0;JMP\n(or)\n@returnAddress10\nD=A\n@R13\nM=D\n@popFromStack\n0;JMP\n(returnAddress10)\n@SP\nM=M-1\nA=M\nM=D|M\n@SP\nM=M+1\n@R14\nA=M\n0;JMP\n(endOr)\n',
     not: '@endNot\n0;JMP\n(not)\n@returnAddress11\nD=A\n@R13\nM=D\n@popFromStack\n0;JMP\n(returnAddress11)\n@SP\nA=M\nM=!D\n@SP\nM=M+1\n@R14\nA=M\n0;JMP\n(endNot)\n'
@@ -100,6 +101,10 @@ const programFlowKeywords = [
     'goto',
     'if-goto'
 ];
+const functionKeywords = [
+    'call',
+    'function'
+];
 const commonSegments = [
     'temp',
     'pointer',
@@ -108,10 +113,12 @@ const commonSegments = [
 
 function parse(command) {
     if (arithmeticKeywords.includes(command.toLowerCase())) return parseArithmeticCommand(command);
+    else if (command === 'return') return insertReturn();
     else {
         const pieces = command.split(' ');
         if (memoryAccessKeywords.includes(pieces[0].toLowerCase())) return parseMemoryAccessCommand(...pieces);
         else if (programFlowKeywords.includes(pieces[0].toLowerCase())) return parseProgramFlowCommand(...pieces);
+        else if (functionKeywords.includes(pieces[0].toLowerCase())) return parseFunctionCommand(...pieces);
     }
 }
 
@@ -310,18 +317,54 @@ function parseMemoryAccessCommand(command, segment, index) {
 }
 
 function parseProgramFlowCommand(command, label) {
+    const finalLabel = currentFunctionName === null ? label : `${currentFunctionName}$${label}`;
     switch (command) {
         case 'label':
-            return `(${label})`;
+            return `(${finalLabel})`;
         case 'goto':
-            return `@${label}\n0;JMP`;
+            return `@${finalLabel}\n0;JMP`;
         case 'if-goto':
-            const commandSet = `@returnAddress${returnAddressIndex}\nD=A\n@R13\nM=D\n@popFromStack\n0;JMP\n(returnAddress${returnAddressIndex})\n@${label}\nD;JNE`;
             returnAddressIndex++;
+            return `@returnAddress${returnAddressIndex - 1}\nD=A\n@R13\nM=D\n@popFromStack\n0;JMP\n(returnAddress${returnAddressIndex - 1})\n@${finalLabel}\nD;JNE`;
+    }
+}
+
+function parseFunctionCommand(command, functionName, args) {
+    currentFunctionName = functionName;
+    let commandSet = '';
+
+    switch (command) {
+        case 'call':
+            commandSet += `${parseMemoryAccessCommand('push', 'constant', `return:${functionName}`)}\n`;
+            commandSet += `${parseMemoryAccessCommand('push', 'constant', 'LCL')}\n`;
+            commandSet += `${parseMemoryAccessCommand('push', 'constant', 'ARG')}\n`;
+            commandSet += `${parseMemoryAccessCommand('push', 'constant', 'THIS')}\n`;
+            commandSet += `${parseMemoryAccessCommand('push', 'constant', 'THAT')}\n`;
+            commandSet += `@SP\nD=M\n@LCL\nM=D\n@${args + 5}\nD=D-A\n@ARG\nM=D\n`;
+            commandSet += `${parseProgramFlowCommand('goto', functionName)}\n(return:${functionName})`;
+            return commandSet;
+        case 'function':
+            commandSet += `(${functionName})`;
+            for (let i = 0; i < args; i++) commandSet += `\n${parseMemoryAccessCommand('push', 'constant', 0)}`;
             return commandSet;
     }
 }
 
-function parseFunctionCallCommand(command) {
+let returnSubroutineAdded = false;
+const returnSubroutine = `@endReturn\n0;JMP\n(return)\n@LCL\nD=M\n@FRAME\nM=D\n@5\nA=D-A\nD=M\n@RET\nM=D\n${parseMemoryAccessCommand('pop', 'arg', 0)}\n@ARG\nD=M+1\n@SP\nM=D\n@FRAME\nA=M-1\nD=M\n@THAT\nM=D\n@2\nD=A\n@FRAME\nA=M-D\nD=M\n@THIS\nM=D\n@3\nD=A\n@FRAME\nA=M-D\nD=M\n@ARG\nM=D\n@4\nD=A\n@FRAME\nA=M-D\nD=M\n@LCL\nM=D\n@RET\n0;JMP\n@R13\nA=M\n0;JMP\n(endReturn)\n`;
 
+function insertReturn() {
+    currentFunctionName = null;
+    let commandSet = '';
+
+    if (!returnSubroutineAdded) {
+        commandSet += returnSubroutine;
+        returnSubroutineAdded = true;
+    }
+
+    commandSet += `@returnAddress${returnAddressIndex}\nD=A\n@R13\nM=D\n@return\n0;JMP\n(returnAddress${returnAddressIndex})`;
+    returnAddressIndex++;
+    return commandSet;
 }
+
+translate(process.argv[2], true);
