@@ -14,7 +14,7 @@ M=-A
 D=A
 @R13
 M=D
-@return:Sys.init
+@return:Sys.init1
 D=A
 @pushToStack
 0;JMP
@@ -65,7 +65,7 @@ D=D-A
 M=D
 @Sys.init
 0;JMP
-(return:Sys.init)
+(return:Sys.init1)
 (Sys.init)
 @endPushToStack
 0;JMP
@@ -140,7 +140,7 @@ M=D
 D=A
 @R13
 M=D
-@return:Sys.main
+@return:Sys.main1
 D=A
 @pushToStack
 0;JMP
@@ -191,7 +191,7 @@ D=D-A
 M=D
 @Sys.main
 0;JMP
-(return:Sys.main)
+(return:Sys.main1)
 @returnAddress26
 D=A
 @R13
@@ -206,8 +206,8 @@ M=D
 @R14
 A=M
 M=D
-(Sys.main$LOOP)
-@Sys.main$LOOP
+(Sys.init$LOOP)
+@Sys.init$LOOP
 0;JMP
 (Sys.main)
 @returnAddress27
@@ -389,7 +389,7 @@ D=A
 D=A
 @R13
 M=D
-@return:Sys.add12
+@return:Sys.add121
 D=A
 @pushToStack
 0;JMP
@@ -440,7 +440,7 @@ D=D-A
 M=D
 @Sys.add12
 0;JMP
-(return:Sys.add12)
+(return:Sys.add121)
 @returnAddress48
 D=A
 @R13

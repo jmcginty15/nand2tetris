@@ -1,8 +1,9 @@
 const fs = require('fs');
 const process = require('process');
 
+let program = [];
 let returnAddressIndex = 12;
-let currentFunctionName = null;
+const functionCalls = {};
 const subroutinesAdded = {
     pushToStack: false,
     popFromStack: false,
@@ -67,10 +68,10 @@ function translate(path, topLevel) {
 
 function parseFile(path) {
     const vmFile = fs.readFileSync(path, 'utf-8');
-    const program = vmFile.split(/\r?\n/);
+    program = vmFile.split(/\r?\n/);
     const commands = [];
-    // const fileName = path.slice(path.lastIndexOf('/') + 1, -3);
 
+    let index = 0;
     for (let command of program) {
         // remove leading whitespace
         while (command.charAt(0) === ' ') command = command.slice(1);
@@ -81,13 +82,15 @@ function parseFile(path) {
         while (command.slice(-1) === ' ') command = command.slice(0, -1);
         // parse command if it is not an empty line
         if (command !== '') {
-            const nextCommand = parse(command);
+            const nextCommand = parse(command, index);
             commands.push(nextCommand);
         }
+        index++;
     }
 
     const asmFile = commands.join('\n');
     outputFiles.push(asmFile);
+    program.length = 0;
 }
 
 const arithmeticKeywords = [
@@ -120,13 +123,13 @@ const commonSegments = [
     'static'
 ];
 
-function parse(command) {
+function parse(command, index) {
     if (arithmeticKeywords.includes(command.toLowerCase())) return parseArithmeticCommand(command);
     else if (command === 'return') return insertReturn();
     else {
         const pieces = command.split(' ');
         if (memoryAccessKeywords.includes(pieces[0].toLowerCase())) return parseMemoryAccessCommand(...pieces);
-        else if (programFlowKeywords.includes(pieces[0].toLowerCase())) return parseProgramFlowCommand(...pieces);
+        else if (programFlowKeywords.includes(pieces[0].toLowerCase())) return parseProgramFlowCommand(...pieces, index);
         else if (functionKeywords.includes(pieces[0].toLowerCase())) return parseFunctionCommand(...pieces);
     }
 }
@@ -325,8 +328,9 @@ function parseMemoryAccessCommand(command, segment, index) {
     }
 }
 
-function parseProgramFlowCommand(command, label) {
-    const finalLabel = currentFunctionName === null ? label : `${currentFunctionName}$${label}`;
+function parseProgramFlowCommand(command, label, commandIndex) {
+    const functionName = findFunctionName(commandIndex);
+    const finalLabel = functionName === null ? label : `${functionName}$${label}`;
     switch (command) {
         case 'label':
             return `(${finalLabel})`;
@@ -338,13 +342,26 @@ function parseProgramFlowCommand(command, label) {
     }
 }
 
+function findFunctionName(commandIndex) {
+    let parts = [];
+    do {
+        commandIndex--;
+        parts = program[commandIndex].split(' ');
+    } while (parts[0] !== 'function' && commandIndex > 0);
+
+    if (commandIndex === 0 && parts[0] !== 'function') return null;
+    else return parts[1];
+}
+
 function parseFunctionCommand(command, functionName, args) {
-    currentFunctionName = functionName;
     let commandSet = '';
 
     switch (command) {
         case 'call':
-            commandSet += `@returnAddress${returnAddressIndex}\nD=A\n@R13\nM=D\n@return:${functionName}\nD=A\n@pushToStack\n0;JMP\n(returnAddress${returnAddressIndex})\n`;
+            if (functionCalls[functionName]) functionCalls[functionName]++;
+            else functionCalls[functionName] = 1;
+
+            commandSet += `@returnAddress${returnAddressIndex}\nD=A\n@R13\nM=D\n@return:${functionName}${functionCalls[functionName]}\nD=A\n@pushToStack\n0;JMP\n(returnAddress${returnAddressIndex})\n`;
             returnAddressIndex++;
             commandSet += `@returnAddress${returnAddressIndex}\nD=A\n@R13\nM=D\n@LCL\nD=M\n@pushToStack\n0;JMP\n(returnAddress${returnAddressIndex})\n`;
             returnAddressIndex++;
@@ -355,7 +372,8 @@ function parseFunctionCommand(command, functionName, args) {
             commandSet += `@returnAddress${returnAddressIndex}\nD=A\n@R13\nM=D\n@THAT\nD=M\n@pushToStack\n0;JMP\n(returnAddress${returnAddressIndex})\n`;
             returnAddressIndex++;
             commandSet += `@SP\nD=M\n@LCL\nM=D\n@${parseInt(args) + 5}\nD=D-A\n@ARG\nM=D\n`;
-            commandSet += `@${functionName}\n0;JMP\n(return:${functionName})`;
+            commandSet += `@${functionName}\n0;JMP\n(return:${functionName}${functionCalls[functionName]})`;
+
             return commandSet;
         case 'function':
             commandSet += `(${functionName})`;
@@ -373,7 +391,6 @@ function returnSubroutine() {
 }
 
 function insertReturn() {
-    currentFunctionName = null;
     let commandSet = '';
 
     if (!returnSubroutineAdded) commandSet += returnSubroutine();
