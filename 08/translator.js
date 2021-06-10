@@ -1,6 +1,42 @@
 const fs = require('fs');
 const process = require('process');
-const files = [];
+
+let returnAddressIndex = 12;
+let currentFunctionName = null;
+const subroutinesAdded = {
+    pushToStack: false,
+    popFromStack: false,
+    add: false,
+    sub: false,
+    neg: false,
+    eq: false,
+    gt: false,
+    lt: false,
+    and: false,
+    or: false,
+    not: false
+};
+const subroutines = {
+    pushToStack: '@endPushToStack\n0;JMP\n(pushToStack)\n@SP\nA=M\nM=D\n@SP\nM=M+1\n@R13\nA=M\n0;JMP\n(endPushToStack)\n',
+    popFromStack: '@endPopFromStack\n0;JMP\n(popFromStack)\n@SP\nM=M-1\nA=M\nD=M\n@R13\nA=M\n0;JMP\n(endPopFromStack)\n',
+    add: '@endAdd\n0;JMP\n(add)\n@returnAddress0\nD=A\n@R13\nM=D\n@popFromStack\n0;JMP\n(returnAddress0)\n@SP\nM=M-1\nA=M\nM=D+M\n@SP\nM=M+1\n@R14\nA=M\n0;JMP\n(endAdd)\n',
+    sub: '@endSub\n0;JMP\n(sub)\n@returnAddress1\nD=A\n@R13\nM=D\n@popFromStack\n0;JMP\n(returnAddress1)\n@SP\nM=M-1\nA=M\nM=M-D\n@SP\nM=M+1\n@R14\nA=M\n0;JMP\n(endSub)\n',
+    neg: '@endNeg\n0;JMP\n(neg)\n@returnAddress2\nD=A\n@R13\nM=D\n@popFromStack\n0;JMP\n(returnAddress2)\n@SP\nA=M\nM=-D\n@SP\nM=M+1\n@R14\nA=M\n0;JMP\n(endNeg)\n',
+    eq: '@endEq\n0;JMP\n(eq)\n@returnAddress3\nD=A\n@R13\nM=D\n@popFromStack\n0;JMP\n(returnAddress3)\n@R15\nM=D\n@returnAddress4\nD=A\n@R13\nM=D\n@R15\nD=M\n@SP\nM=M-1\nA=M\nD=M-D\n@equals\nD;JEQ\nD=0\n@enterResult1\n0;JMP\n(equals)\nD=-1\n(enterResult1)\n@pushToStack\n0;JMP\n(returnAddress4)\n@R14\nA=M\n0;JMP\n(endEq)\n',
+    gt: '@endGt\n0;JMP\n(gt)\n@returnAddress5\nD=A\n@R13\nM=D\n@popFromStack\n0;JMP\n(returnAddress5)\n@R15\nM=D\n@returnAddress6\nD=A\n@R13\nM=D\n@R15\nD=M\n@SP\nM=M-1\nA=M\nD=M-D\n@equals\nD;JGT\nD=0\n@enterResult2\n0;JMP\n(equals)\nD=-1\n(enterResult2)\n@pushToStack\n0;JMP\n(returnAddress6)\n@R14\nA=M\n0;JMP\n(endGt)\n',
+    lt: '@endLt\n0;JMP\n(lt)\n@returnAddress7\nD=A\n@R13\nM=D\n@popFromStack\n0;JMP\n(returnAddress7)\n@R15\nM=D\n@returnAddress8\nD=A\n@R13\nM=D\n@R15\nD=M\n@SP\nM=M-1\nA=M\nD=M-D\n@equals\nD;JLT\nD=0\n@enterResult3\n0;JMP\n(equals)\nD=-1\n(enterResult3)\n@pushToStack\n0;JMP\n(returnAddress8)\n@R14\nA=M\n0;JMP\n(endLt)\n',
+    and: '@endAnd\n0;JMP\n(and)\n@returnAddress9\nD=A\n@R13\nM=D\n@popFromStack\n0;JMP\n(returnAddress9)\n@SP\nM=M-1\nA=M\nM=D&M\n@SP\nM=M+1\n@R14\nA=M\n0;JMP\n(endAnd)\n',
+    or: '@endOr\n0;JMP\n(or)\n@returnAddress10\nD=A\n@R13\nM=D\n@popFromStack\n0;JMP\n(returnAddress10)\n@SP\nM=M-1\nA=M\nM=D|M\n@SP\nM=M+1\n@R14\nA=M\n0;JMP\n(endOr)\n',
+    not: '@endNot\n0;JMP\n(not)\n@returnAddress11\nD=A\n@R13\nM=D\n@popFromStack\n0;JMP\n(returnAddress11)\n@SP\nA=M\nM=!D\n@SP\nM=M+1\n@R14\nA=M\n0;JMP\n(endNot)\n'
+};
+const outputFiles = [
+    '@256\nD=A\n@SP\nM=D',
+    '@LCL\nM=-A',
+    '@ARG\nM=-A',
+    '@THIS\nM=-A',
+    '@THAT\nM=-A',
+    parseFunctionCommand('call', 'Sys.init', 0)
+];
 
 function translate(path, topLevel) {
     let outputPath = '';
@@ -15,8 +51,10 @@ function translate(path, topLevel) {
         parseFile(path);
     }
 
-    const asmFile = files.join('\n');
     if (topLevel) {
+        outputFiles.push('(terminationLoop)\n@terminationLoop\n0;JMP');
+        const asmFile = outputFiles.join('\n');
+
         fs.writeFile(`${outputPath}.asm`, asmFile, function (err) {
             if (err) {
                 console.error(err);
@@ -47,40 +85,11 @@ function parseFile(path) {
             commands.push(nextCommand);
         }
     }
-    commands.push('(terminationLoop)\n@terminationLoop\n0;JMP');
 
     const asmFile = commands.join('\n');
-    files.push(asmFile);
+    outputFiles.push(asmFile);
 }
 
-let returnAddressIndex = 12;
-let currentFunctionName = null;
-const subroutinesAdded = {
-    pushToStack: false,
-    popFromStack: false,
-    add: false,
-    sub: false,
-    neg: false,
-    eq: false,
-    gt: false,
-    lt: false,
-    and: false,
-    or: false,
-    not: false
-};
-const subroutines = {
-    pushToStack: '@endPushToStack\n0;JMP\n(pushToStack)\n@SP\nA=M\nM=D\n@SP\nM=M+1\n@R13\nA=M\n0;JMP\n(endPushToStack)\n',
-    popFromStack: '@endPopFromStack\n0;JMP\n(popFromStack)\n@SP\nM=M-1\nA=M\nD=M\n@R13\nA=M\n0;JMP\n(endPopFromStack)\n',
-    add: '@endAdd\n0;JMP\n(add)\n@returnAddress0\nD=A\n@R13\nM=D\n@popFromStack\n0;JMP\n(returnAddress0)\n@SP\nM=M-1\nA=M\nM=D+M\n@SP\nM=M+1\n@R14\nA=M\n0;JMP\n(endAdd)\n',
-    sub: '@endSub\n0;JMP\n(sub)\n@returnAddress1\nD=A\n@R13\nM=D\n@popFromStack\n0;JMP\n(returnAddress1)\n@SP\nM=M-1\nA=M\nM=M-D\n@SP\nM=M+1\n@R14\nA=M\n0;JMP\n(endSub)\n',
-    neg: '@endNeg\n0;JMP\n(neg)\n@returnAddress2\nD=A\n@R13\nM=D\n@popFromStack\n0;JMP\n(returnAddress2)\n@SP\nA=M\nM=-D\n@SP\nM=M+1\n@R14\nA=M\n0;JMP\n(endNeg)\n',
-    eq: '@endEq\n0;JMP\n(eq)\n@returnAddress3\nD=A\n@R13\nM=D\n@popFromStack\n0;JMP\n(returnAddress3)\n@R15\nM=D\n@returnAddress4\nD=A\n@R13\nM=D\n@R15\nD=M\n@SP\nM=M-1\nA=M\nD=M-D\n@equals\nD;JEQ\nD=0\n@enterResult1\n0;JMP\n(equals)\nD=-1\n(enterResult1)\n@pushToStack\n0;JMP\n(returnAddress4)\n@R14\nA=M\n0;JMP\n(endEq)\n',
-    gt: '@endGt\n0;JMP\n(gt)\n@returnAddress5\nD=A\n@R13\nM=D\n@popFromStack\n0;JMP\n(returnAddress5)\n@R15\nM=D\n@returnAddress6\nD=A\n@R13\nM=D\n@R15\nD=M\n@SP\nM=M-1\nA=M\nD=M-D\n@equals\nD;JGT\nD=0\n@enterResult2\n0;JMP\n(equals)\nD=-1\n(enterResult2)\n@pushToStack\n0;JMP\n(returnAddress6)\n@R14\nA=M\n0;JMP\n(endGt)\n',
-    lt: '@endLt\n0;JMP\n(lt)\n@returnAddress7\nD=A\n@R13\nM=D\n@popFromStack\n0;JMP\n(returnAddress7)\n@R15\nM=D\n@returnAddress8\nD=A\n@R13\nM=D\n@R15\nD=M\n@SP\nM=M-1\nA=M\nD=M-D\n@equals\nD;JLT\nD=0\n@enterResult3\n0;JMP\n(equals)\nD=-1\n(enterResult3)\n@pushToStack\n0;JMP\n(returnAddress8)\n@R14\nA=M\n0;JMP\n(endLt)\n',
-    and: '@endAnd\n0;JMP\n(and)\n@returnAddress9\nD=A\n@R13\nM=D\n@popFromStack\n0;JMP\n(returnAddress9)\n@SP\nM=M-1\nA=M\nM=D&M\n@SP\nM=M+1\n@R14\nA=M\n0;JMP\n(endAnd)\n',
-    or: '@endOr\n0;JMP\n(or)\n@returnAddress10\nD=A\n@R13\nM=D\n@popFromStack\n0;JMP\n(returnAddress10)\n@SP\nM=M-1\nA=M\nM=D|M\n@SP\nM=M+1\n@R14\nA=M\n0;JMP\n(endOr)\n',
-    not: '@endNot\n0;JMP\n(not)\n@returnAddress11\nD=A\n@R13\nM=D\n@popFromStack\n0;JMP\n(returnAddress11)\n@SP\nA=M\nM=!D\n@SP\nM=M+1\n@R14\nA=M\n0;JMP\n(endNot)\n'
-};
 const arithmeticKeywords = [
     'add',
     'sub',
@@ -335,35 +344,42 @@ function parseFunctionCommand(command, functionName, args) {
 
     switch (command) {
         case 'call':
-            commandSet += `${parseMemoryAccessCommand('push', 'constant', `return:${functionName}`)}\n`;
-            commandSet += `${parseMemoryAccessCommand('push', 'constant', 'LCL')}\n`;
-            commandSet += `${parseMemoryAccessCommand('push', 'constant', 'ARG')}\n`;
-            commandSet += `${parseMemoryAccessCommand('push', 'constant', 'THIS')}\n`;
-            commandSet += `${parseMemoryAccessCommand('push', 'constant', 'THAT')}\n`;
-            commandSet += `@SP\nD=M\n@LCL\nM=D\n@${args + 5}\nD=D-A\n@ARG\nM=D\n`;
-            commandSet += `${parseProgramFlowCommand('goto', functionName)}\n(return:${functionName})`;
+            commandSet += `@returnAddress${returnAddressIndex}\nD=A\n@R13\nM=D\n@return:${functionName}\nD=A\n@pushToStack\n0;JMP\n(returnAddress${returnAddressIndex})\n`;
+            returnAddressIndex++;
+            commandSet += `@returnAddress${returnAddressIndex}\nD=A\n@R13\nM=D\n@LCL\nD=M\n@pushToStack\n0;JMP\n(returnAddress${returnAddressIndex})\n`;
+            returnAddressIndex++;
+            commandSet += `@returnAddress${returnAddressIndex}\nD=A\n@R13\nM=D\n@ARG\nD=M\n@pushToStack\n0;JMP\n(returnAddress${returnAddressIndex})\n`;
+            returnAddressIndex++;
+            commandSet += `@returnAddress${returnAddressIndex}\nD=A\n@R13\nM=D\n@THIS\nD=M\n@pushToStack\n0;JMP\n(returnAddress${returnAddressIndex})\n`;
+            returnAddressIndex++;
+            commandSet += `@returnAddress${returnAddressIndex}\nD=A\n@R13\nM=D\n@THAT\nD=M\n@pushToStack\n0;JMP\n(returnAddress${returnAddressIndex})\n`;
+            returnAddressIndex++;
+            commandSet += `@SP\nD=M\n@LCL\nM=D\n@${parseInt(args) + 5}\nD=D-A\n@ARG\nM=D\n`;
+            commandSet += `@${functionName}\n0;JMP\n(return:${functionName})`;
             return commandSet;
         case 'function':
             commandSet += `(${functionName})`;
-            for (let i = 0; i < args; i++) commandSet += `\n${parseMemoryAccessCommand('push', 'constant', 0)}`;
+            for (let i = 0; i < parseInt(args); i++) commandSet += `\n${parseMemoryAccessCommand('push', 'constant', 0)}`;
             return commandSet;
     }
 }
 
 let returnSubroutineAdded = false;
-const returnSubroutine = `@endReturn\n0;JMP\n(return)\n@LCL\nD=M\n@FRAME\nM=D\n@5\nA=D-A\nD=M\n@RET\nM=D\n${parseMemoryAccessCommand('pop', 'arg', 0)}\n@ARG\nD=M+1\n@SP\nM=D\n@FRAME\nA=M-1\nD=M\n@THAT\nM=D\n@2\nD=A\n@FRAME\nA=M-D\nD=M\n@THIS\nM=D\n@3\nD=A\n@FRAME\nA=M-D\nD=M\n@ARG\nM=D\n@4\nD=A\n@FRAME\nA=M-D\nD=M\n@LCL\nM=D\n@RET\n0;JMP\n@R13\nA=M\n0;JMP\n(endReturn)\n`;
+function returnSubroutine() {
+    returnSubroutineAdded = true;
+    const returnSubroutine = `@endReturn\n0;JMP\n(return)\n@LCL\nD=M\n@FRAME\nM=D\n@5\nA=D-A\nD=M\n@RET\nM=D\n@returnAddress${returnAddressIndex}\nD=A\n@R13\nM=D\n@popFromStack\n0;JMP\n(returnAddress${returnAddressIndex})\n@ARG\nA=M\nM=D\n@ARG\nD=M+1\n@SP\nM=D\n@FRAME\nA=M-1\nD=M\n@THAT\nM=D\n@2\nD=A\n@FRAME\nA=M-D\nD=M\n@THIS\nM=D\n@3\nD=A\n@FRAME\nA=M-D\nD=M\n@ARG\nM=D\n@4\nD=A\n@FRAME\nA=M-D\nD=M\n@LCL\nM=D\n@RET\nA=M\n0;JMP\n@R14\nA=M\n0;JMP\n(endReturn)\n`;
+    returnAddressIndex++;
+    return returnSubroutine;
+}
 
 function insertReturn() {
     currentFunctionName = null;
     let commandSet = '';
 
-    if (!returnSubroutineAdded) {
-        commandSet += returnSubroutine;
-        returnSubroutineAdded = true;
-    }
-
-    commandSet += `@returnAddress${returnAddressIndex}\nD=A\n@R13\nM=D\n@return\n0;JMP\n(returnAddress${returnAddressIndex})`;
+    if (!returnSubroutineAdded) commandSet += returnSubroutine();
+    commandSet += `@returnAddress${returnAddressIndex}\nD=A\n@R14\nM=D\n@return\n0;JMP\n(returnAddress${returnAddressIndex})`;
     returnAddressIndex++;
+
     return commandSet;
 }
 
