@@ -299,9 +299,6 @@ function parseMemoryAccessCommand(command, segment, index, filename = null) {
                     case 'temp':
                         baseIndex = 5;
                         break;
-                    case 'static':
-                        baseIndex = 16;
-                        break;
                 }
                 const a = baseIndex + parseInt(index);
                 commandSet += `@returnAddress${returnAddressIndex}\nD=A\n@R13\nM=D\n@${a}\nD=A\n@R14\nM=D\n@popFromStack\n0;JMP\n(returnAddress${returnAddressIndex})\n@R14\nA=M\nM=D`;
