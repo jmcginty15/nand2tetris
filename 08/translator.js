@@ -67,6 +67,7 @@ function translate(path, topLevel) {
 }
 
 function parseFile(path) {
+    const filename = path.slice(path.lastIndexOf('/') + 1, path.lastIndexOf('.'));
     const vmFile = fs.readFileSync(path, 'utf-8');
     program = vmFile.split(/\r?\n/);
     const commands = [];
@@ -82,7 +83,7 @@ function parseFile(path) {
         while (command.slice(-1) === ' ') command = command.slice(0, -1);
         // parse command if it is not an empty line
         if (command !== '') {
-            const nextCommand = parse(command, index);
+            const nextCommand = parse(command, index, filename);
             commands.push(nextCommand);
         }
         index++;
@@ -119,16 +120,15 @@ const functionKeywords = [
 ];
 const commonSegments = [
     'temp',
-    'pointer',
-    'static'
+    'pointer'
 ];
 
-function parse(command, index) {
+function parse(command, index, filename) {
     if (arithmeticKeywords.includes(command.toLowerCase())) return parseArithmeticCommand(command);
     else if (command === 'return') return insertReturn();
     else {
         const pieces = command.split(' ');
-        if (memoryAccessKeywords.includes(pieces[0].toLowerCase())) return parseMemoryAccessCommand(...pieces);
+        if (memoryAccessKeywords.includes(pieces[0].toLowerCase())) return parseMemoryAccessCommand(...pieces, filename);
         else if (programFlowKeywords.includes(pieces[0].toLowerCase())) return parseProgramFlowCommand(...pieces, index);
         else if (functionKeywords.includes(pieces[0].toLowerCase())) return parseFunctionCommand(...pieces);
     }
@@ -237,7 +237,7 @@ function parseArithmeticCommand(command) {
     }
 }
 
-function parseMemoryAccessCommand(command, segment, index) {
+function parseMemoryAccessCommand(command, segment, index, filename = null) {
     let commandSet = '';
 
     switch (command) {
@@ -259,12 +259,12 @@ function parseMemoryAccessCommand(command, segment, index) {
                     case 'temp':
                         baseIndex = 5;
                         break;
-                    case 'static':
-                        baseIndex = 16;
-                        break;
                 }
                 const a = baseIndex + parseInt(index);
                 commandSet += `@returnAddress${returnAddressIndex}\nD=A\n@R13\nM=D\n@${a}\nD=M\n@pushToStack\n0;JMP\n(returnAddress${returnAddressIndex})`;
+                returnAddressIndex++;
+            } else if (segment === 'static') {
+                commandSet += `@returnAddress${returnAddressIndex}\nD=A\n@R13\nM=D\n@${filename}.${index}\nD=M\n@pushToStack\n0;JMP\n(returnAddress${returnAddressIndex})`;
                 returnAddressIndex++;
             } else {
                 switch (segment) {
@@ -305,6 +305,9 @@ function parseMemoryAccessCommand(command, segment, index) {
                 }
                 const a = baseIndex + parseInt(index);
                 commandSet += `@returnAddress${returnAddressIndex}\nD=A\n@R13\nM=D\n@${a}\nD=A\n@R14\nM=D\n@popFromStack\n0;JMP\n(returnAddress${returnAddressIndex})\n@R14\nA=M\nM=D`;
+                returnAddressIndex++;
+            } else if (segment === 'static') {
+                commandSet += `@returnAddress${returnAddressIndex}\nD=A\n@R13\nM=D\n@popFromStack\n0;JMP\n(returnAddress${returnAddressIndex})\n@${filename}.${index}\nM=D`;
                 returnAddressIndex++;
             } else {
                 let segmentSymbol = '';
