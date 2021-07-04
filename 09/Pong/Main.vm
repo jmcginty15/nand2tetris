@@ -1,0 +1,69 @@
+function Main.main 1
+call Pong.new 0
+pop local 0
+push local 0
+push constant 17
+call String.new 1
+push constant 80
+call String.appendChar 2
+push constant 114
+call String.appendChar 2
+push constant 101
+call String.appendChar 2
+push constant 115
+call String.appendChar 2
+push constant 115
+call String.appendChar 2
+push constant 32
+call String.appendChar 2
+push constant 71
+call String.appendChar 2
+push constant 32
+call String.appendChar 2
+push constant 116
+call String.appendChar 2
+push constant 111
+call String.appendChar 2
+push constant 32
+call String.appendChar 2
+push constant 115
+call String.appendChar 2
+push constant 116
+call String.appendChar 2
+push constant 97
+call String.appendChar 2
+push constant 114
+call String.appendChar 2
+push constant 116
+call String.appendChar 2
+push constant 33
+call String.appendChar 2
+push constant 1
+neg
+call Pong.run 3
+pop temp 0
+label WHILE_EXP0
+push local 0
+call Pong.getTopScore 1
+push constant 5
+lt
+push local 0
+call Pong.getBottomScore 1
+push constant 5
+lt
+and
+not
+if-goto WHILE_END0
+push local 0
+call Pong.resetPoint 1
+pop temp 0
+goto WHILE_EXP0
+label WHILE_END0
+push local 0
+call Pong.end 1
+pop temp 0
+push local 0
+call Pong.dispose 1
+pop temp 0
+push constant 0
+return

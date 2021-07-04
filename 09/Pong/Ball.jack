@@ -1,0 +1,86 @@
+class Ball {
+    field int x, y;         // screen location of ball's center
+    field int r;            // ball's radius
+    field int xDir, yDir;   // current direction of travel as an x-y vector
+
+    constructor Ball new(int radius) {
+        let r = radius;
+        let x = 256;
+        let y = 126;
+        let xDir = 0;
+        let yDir = -1;
+        do draw();
+        return this;
+    }
+
+    method int getXDir() {
+        return xDir;
+    }
+
+    method int getYDir() {
+        return yDir;
+    }
+
+    method void setXDir(int newX) {
+        let xDir = newX;
+        return;
+    }
+
+    method void setYDir(int newY) {
+        let yDir = newY;
+        return;
+    }
+
+    method int getX() {
+        return x;
+    }
+
+    method int getY() {
+        return y;
+    }
+
+    method void setPos(int xPos, int yPos) {
+        let x = xPos;
+        let y = yPos;
+        return;
+    }
+
+    method int getR() {
+        return r;
+    }
+
+    method void move(int cycle) {
+        if ((cycle = (cycle / 2 * 2)) | ((Math.abs(xDir) < 2) & (Math.abs(yDir) < 2))) {
+            if ((xDir = 0) | ((xDir < 0) & ((x - r) > ((Math.abs(xDir) * 2) - 1))) | ((xDir > 0) & ((x + r) < (512 - (Math.abs(xDir) * 2))))) {
+                if ((yDir = 0) | ((yDir < 0) & ((y - r) > ((Math.abs(yDir) * 2) - 1))) | ((yDir > 0) & ((y + r) < (256 - (Math.abs(yDir) * 2))))) {
+                    do erase();
+                    let x = x + (2 * xDir);
+                    let y = y + (2 * yDir);
+                    do draw();
+                }
+            }
+
+            if (((x - r) = 0) | ((x - r) = 1) | ((x + r) = 511) | ((x + r) = 510)) {
+                let xDir = -xDir;
+            }
+        }
+        return;
+    }
+
+    method void draw() {
+        do Screen.setColor(true);
+        do Screen.drawCircle(x, y, r);
+        return;
+    }
+
+    method void erase() {
+        do Screen.setColor(false);
+        do Screen.drawCircle(x, y, r);
+        return;
+    }
+
+    method void dispose() {
+        do Memory.deAlloc(this);
+        return;
+    }
+}

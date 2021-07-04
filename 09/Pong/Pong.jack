@@ -1,0 +1,219 @@
+class Pong {
+    field Ball ball;
+    field Paddle topPaddle, bottomPaddle;
+    field boolean running;
+    field int topScore, bottomScore;
+    field int pointNum;
+
+    constructor Pong new() {
+        let ball = Ball.new(3);
+        let topPaddle = Paddle.new(15, 3, 15);
+        let bottomPaddle = Paddle.new(15, 3, 237);
+        let running = false;
+        let topScore = 0;
+        let bottomScore = 0;
+        let pointNum = 0;
+        return this;
+    }
+
+    method void run(String message, int ballYDir) {
+        var int cycle;
+        var char key;
+        var boolean running;
+        var boolean topPoint, bottomPoint;
+
+        let cycle = 0;
+        let key = Keyboard.keyPressed();
+        let topPoint = false;
+        let bottomPoint = false;
+        do ball.setYDir(ballYDir);
+
+        do Output.moveCursor(0, 0);
+        do Output.printString(message);
+        while (~running) {
+            if (key = 71) {
+                do start();
+                let running = true;
+            }
+            let key = Keyboard.keyPressed();
+        }
+
+        while (running) {
+            if (key = 65) { do topPaddle.setDir(-1); }
+            if (key = 83) { do topPaddle.setDir(0); }
+            if (key = 68) { do topPaddle.setDir(1); }
+            do topPaddle.move();
+
+            if (key = 130) { do bottomPaddle.setDir(-1); }
+            if (key = 133) { do bottomPaddle.setDir(0); }
+            if (key = 132) { do bottomPaddle.setDir(1); }
+            do bottomPaddle.move();
+
+            do ball.move(cycle);
+
+            if ((ball.getY() + ball.getR()) > (237 - bottomPaddle.getHeight())) { let topPoint = ~(checkHit(bottomPaddle)); }
+            if ((ball.getY() - ball.getR()) < (15 + topPaddle.getHeight())) { let bottomPoint = ~(checkHit(topPaddle)); }
+
+            if (topPoint) {
+                let topScore = topScore + 1;
+                do Output.moveCursor(0, 63);
+                do Output.printInt(topScore);
+                do Output.moveCursor(0, 0);
+                do Output.printString("Player 1 scores!");
+                let running = false;
+            }
+            if (bottomPoint) {
+                let bottomScore = bottomScore + 1;
+                do Output.moveCursor(22, 63);
+                do Output.printInt(bottomScore);
+                do Output.moveCursor(0, 0);
+                do Output.printString("Player 2 scores!");
+                let running = false;
+            }
+
+            let key = Keyboard.keyPressed();
+            if (cycle = 32766) { let cycle = 0; }
+            else { let cycle = cycle + 1; }
+        }
+
+        let pointNum = pointNum + 1;
+        do Sys.wait(2500);
+        return;
+    }
+
+    method boolean checkHit(Paddle paddle) {
+        var int r1, r2, r3, r4;
+        var int l1, l2, l3, l4;
+
+        let l4 = paddle.getX() - paddle.getWidth();
+        let r4 = paddle.getX() + paddle.getWidth();
+
+        let l3 = l4 + (paddle.getWidth() * 2 / 7);
+        let r3 = r4 - (paddle.getWidth() * 2 / 7);
+
+        let l2 = l3 + (paddle.getWidth() * 2 / 7);
+        let r2 = r3 - (paddle.getWidth() * 2 / 7);
+
+        let l1 = l2 + (paddle.getWidth() * 2 / 7);
+        let r1 = r2 - (paddle.getWidth() * 2 / 7);
+
+        if (((ball.getX() + ball.getR()) > l4) & ((ball.getX() - ball.getR()) < r4)) {
+            if (ball.getX() < l3) {
+                do ball.setXDir(-2);
+
+                if (ball.getYDir() < 0) { do ball.setYDir(1); }
+                else { do ball.setYDir(-1); }
+            } else {
+                if (ball.getX() < l2) {
+                    do ball.setXDir(-1);
+
+                    if (ball.getYDir() < 0) { do ball.setYDir(1); }
+                    else { do ball.setYDir(-1); }
+                } else {
+                    if (ball.getX() < l1) {
+                        do ball.setXDir(-1);
+
+                        if (ball.getYDir() < 0) { do ball.setYDir(2); }
+                        else { do ball.setYDir(-2); }
+                    }
+                }
+            }
+
+            if (ball.getX() > r3) {
+                do ball.setXDir(2);
+
+                if (ball.getYDir() < 0) { do ball.setYDir(1); }
+                else { do ball.setYDir(-1); }
+            } else {
+                if (ball.getX() > r2) {
+                    do ball.setXDir(1);
+
+                    if (ball.getYDir() < 0) { do ball.setYDir(1); }
+                    else { do ball.setYDir(-1); }
+                } else {
+                    if (ball.getX() > r1) {
+                        do ball.setXDir(1);
+
+                        if (ball.getYDir() < 0) { do ball.setYDir(2); }
+                        else { do ball.setYDir(-2); }
+                    }
+                }
+            }
+
+            if (~(ball.getX() < l1) & ~(ball.getX() > r1)) {
+                do ball.setXDir(0);
+
+                if (ball.getYDir() < 0) { do ball.setYDir(1); }
+                else { do ball.setYDir(-1); }
+            }
+
+            return true;
+        }
+        
+        return false;
+    }
+
+    method void start() {
+        do Screen.setColor(false);
+        do Screen.drawRectangle(0, 0, 160, 20);
+        do Output.moveCursor(0, 63);
+        do Output.printInt(topScore);
+        do Output.moveCursor(22, 63);
+        do Output.printInt(bottomScore);
+        return;
+    }
+
+    method void resetPoint() {
+        var int newBallDir;
+
+        do ball.erase();
+        do ball.setPos(256, 126);
+        do ball.draw();
+
+        do topPaddle.erase();
+        do topPaddle.setPos(256, 15);
+        do topPaddle.setDir(0);
+        do topPaddle.draw();
+
+        do bottomPaddle.erase();
+        do bottomPaddle.setPos(256, 237);
+        do bottomPaddle.setDir(0);
+        do bottomPaddle.draw();
+
+        if (pointNum = (pointNum / 2 * 2)) { let newBallDir = -1; }
+        else { let newBallDir = 1; }
+        do run("Press G to continue!", newBallDir);
+
+        return;
+    }
+
+    method void end() {
+        var int winner;
+
+        if (topScore = 5) { let winner = 1; }
+        if (bottomScore = 5) { let winner = 2; }
+
+        do Screen.setColor(false);
+        do Screen.drawRectangle(0, 0, 160, 20);
+        do Output.moveCursor(0, 0);
+        do Output.printString("Game over!");
+        do Output.println();
+        do Output.printString("Player ");
+        do Output.printInt(winner);
+        do Output.printString(" wins!");
+        return;
+    }
+
+    method int getTopScore() {
+        return topScore;
+    }
+
+    method int getBottomScore() {
+        return bottomScore;
+    }
+
+    method void dispose() {
+        do Memory.deAlloc(this);
+        return;
+    }
+}

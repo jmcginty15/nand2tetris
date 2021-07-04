@@ -1,0 +1,11 @@
+class Main {
+    function void main() {
+        var Pong pong;
+        let pong = Pong.new();
+        do pong.run("Press G to start!", -1);
+        while ((pong.getTopScore() < 5) & (pong.getBottomScore() < 5)) { do pong.resetPoint(); }
+        do pong.end();
+        do pong.dispose();
+        return;
+    }
+}

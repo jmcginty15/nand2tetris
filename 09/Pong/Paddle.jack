@@ -1,0 +1,73 @@
+class Paddle {
+    field int x, y;             // screen location of paddle's center
+    field int width, height;    // paddle's height and width radii
+    field int dir;              // current direction of travel
+
+    constructor Paddle new(int wRad, int hRad, int yLoc) {
+        let x = 256;
+        let y = yLoc;
+        let width = wRad;
+        let height = hRad;
+        let dir = 0;
+        do draw();
+        return this;
+    }
+
+    method int getX() {
+        return x;
+    }
+
+    method int getY() {
+        return y;
+    }
+
+    method void setPos(int xPos, int yPos) {
+        let x = xPos;
+        let y = yPos;
+        return;
+    }
+
+    method int getWidth() {
+        return width;
+    }
+
+    method int getHeight() {
+        return height;
+    }
+
+    method int getDir() {
+        return dir;
+    }
+
+    method void setDir(int newDir) {
+        let dir = newDir;
+        return;
+    }
+
+    method void move() {
+        if (((dir = -1) & ((x - width) > 2)) | ((dir = 1) & ((x + width) < 509))) {
+            do erase();
+            let x = x + (3 * dir);
+            do draw();
+        }
+
+        return;
+    }
+
+    method void draw() {
+        do Screen.setColor(true);
+        do Screen.drawRectangle(x - width, y - height, x + width, y + height);
+        return;
+    }
+
+    method void erase() {
+        do Screen.setColor(false);
+        do Screen.drawRectangle(x - width, y - height, x + width, y + height);
+        return;
+    }
+
+    method void dispose() {
+        do Memory.deAlloc(this);
+        return;
+    }
+}
