@@ -1,4 +1,4 @@
-const SubroutineCall = require('./SubroutineCall');
+const { SubroutineCall, Expression } = require('./expressions');
 const { STATEMENT_KEYWORDS } = require('./constants');
 
 class Statement {
@@ -15,15 +15,29 @@ class Statement {
                 const varName = this.tokens[index].value;
                 let arrayIndexExpression = null;
                 if (this.tokens[index + 1].value === '[') {
-                    arrayIndexExpression = this.tokens[index + 2].value;
+                    var endIndex = index + 2;
+                    while (this.tokens[endIndex].value !== ']') endIndex++;
+                    arrayIndexExpression = this.tokens.slice(index + 2, endIndex);
+                    index = endIndex;
                 }
                 while (this.tokens[index].value !== '=') index++;
-                const expression = this.tokens[index + 1].value;
+                index++;
+                var endIndex = index;
+                while (this.tokens[endIndex].value !== ';') endIndex++;
+                const expression = this.tokens.slice(index, endIndex);
                 this.statement = new LetStatement(varName, arrayIndexExpression, expression);
                 break;
             case 'if':
-                const ifCondition = this.tokens[index + 1].value;
+                var braceDiff = 1;
+                var endIndex = index;
+                while (braceDiff !== 0) {
+                    endIndex++;
+                    if (this.tokens[endIndex].value === '(') braceDiff++;
+                    else if (this.tokens[endIndex].value === ')') braceDiff--;
+                }
+                const ifCondition = this.tokens.slice(index + 1, endIndex);
 
+                index = endIndex + 1;
                 while (this.tokens[index].value !== '{') index++;
                 var endIndex = index;
                 var braceDiff = 1;
@@ -51,7 +65,14 @@ class Statement {
                 this.statement = new IfStatement(ifCondition, ifBody, elseBody);
                 break;
             case 'while':
-                const whileCondition = this.tokens[index + 1].value;
+                var braceDiff = 1;
+                var endIndex = index;
+                while (braceDiff !== 0) {
+                    endIndex++;
+                    if (this.tokens[endIndex].value === '(') braceDiff++;
+                    else if (this.tokens[endIndex].value === ')') braceDiff--;
+                }
+                const whileCondition = this.tokens.slice(index + 1, endIndex);
 
                 while (this.tokens[index].value !== '{') index++;
                 var endIndex = index;
@@ -82,23 +103,29 @@ class Statement {
 }
 
 class LetStatement {
-    constructor(varName, arrayIndexExpression, expression) {
+    constructor(varName, arrayIndexTokens, expressionTokens) {
         this.varName = varName;
-        this.arrayIndexExpression = arrayIndexExpression;
-        this.expression = expression;
+        this.arrayIndexTokens = arrayIndexTokens;
+        this.expressionTokens = expressionTokens;
+        this.compile();
+    }
+
+    compile() {
+        if (this.arrayIndexTokens) this.arrayIndexExpression = new Expression(this.arrayIndexTokens);
+        this.expression = new Expression(this.expressionTokens);
     }
 
     compileXml() {
         let output = `<letStatement>\n<keyword> let </keyword>\n<identifier> ${this.varName} </identifier>\n`;
-        if (this.arrayIndexExpression) output += `<symbol> [ </symbol>\n<expression>\n<term> ${this.arrayIndexExpression} </term>\n</expression>\n<symbol> ] </symbol>\n`;
-        output += `<symbol> = </symbol>\n<expression>\n<term>\n<identifier> ${this.expression} </identifier>\n</term>\n</expression>\n<symbol> ; </symbol>\n</letStatement>\n`;
+        if (this.arrayIndexTokens) output += `<symbol> [ </symbol>\n${this.arrayIndexExpression.compileXml()}<symbol> ] </symbol>\n`;
+        output += `<symbol> = </symbol>\n${this.expression.compileXml()}<symbol> ; </symbol>\n</letStatement>\n`;
         return output;
     }
 }
 
 class IfStatement {
-    constructor(condition, ifTokens, elseTokens) {
-        this.condition = condition;
+    constructor(conditionTokens, ifTokens, elseTokens) {
+        this.conditionTokens = conditionTokens;
         this.ifTokens = ifTokens;
         this.elseTokens = elseTokens;
         this.compile();
@@ -141,12 +168,13 @@ class IfStatement {
             }
         }
 
+        this.condition = new Expression(this.conditionTokens);
         this.ifStatements = ifStatements;
         this.elseStatements = elseStatements;
     }
 
     compileXml() {
-        let output = `<ifStatement>\n<keyword> if </keyword>\n<symbol> ( </symbol>\n<expression>\n<term>\n<identifier> ${this.condition} </identifier>\n</term>\n</expression>\n<symbol> ) </symbol>\n<symbol> { </symbol>\n<statements>\n`;
+        let output = `<ifStatement>\n<keyword> if </keyword>\n<symbol> ( </symbol>\n${this.condition.compileXml()}<symbol> ) </symbol>\n<symbol> { </symbol>\n<statements>\n`;
         for (let statement of this.ifStatements) output += statement.compileXml();
         output += '</statements>\n<symbol> } </symbol>\n';
         if (this.elseTokens) {
@@ -160,8 +188,8 @@ class IfStatement {
 }
 
 class WhileStatement {
-    constructor(condition, tokens) {
-        this.condition = condition;
+    constructor(conditionTokens, tokens) {
+        this.conditionTokens = conditionTokens;
         this.tokens = tokens;
         this.compile();
     }
@@ -184,11 +212,12 @@ class WhileStatement {
             index = endIndex;
         }
 
+        this.condition = new Expression(this.conditionTokens);
         this.statements = statements;
     }
 
     compileXml() {
-        let output = `<whileStatement>\n<keyword> while </keyword>\n<symbol> ( </symbol>\n<expression>\n<term>\n<identifier> ${this.condition} </identifier>\n</term>\n</expression>\n<symbol> ) </symbol>\n<symbol> { </symbol>\n<statements>\n`;
+        let output = `<whileStatement>\n<keyword> while </keyword>\n<symbol> ( </symbol>\n${this.condition.compileXml()}<symbol> ) </symbol>\n<symbol> { </symbol>\n<statements>\n`;
         for (let statement of this.statements) output += statement.compileXml();
         output += '</statements>\n<symbol> } </symbol>\n</whileStatement>\n';
         return output;
@@ -211,29 +240,27 @@ class DoStatement {
         const subroutineName = this.tokens[index].value;
 
         while (this.tokens[index].value !== '(') index++;
-        let endIndex = index;
-        while (this.tokens[endIndex].value !== ')') endIndex++;
-
-        this.subroutine = new SubroutineCall(className, subroutineName, this.tokens.slice(index + 1, endIndex));
+        this.subroutine = new SubroutineCall(className, subroutineName, this.tokens.slice(index + 1, this.tokens.length - 2));
     }
 
     compileXml() {
-        return `<doStatement>\n<keyword> do </keyword>\n${this.subroutine.compileXml()}</doStatement>\n`;
+        return `<doStatement>\n<keyword> do </keyword>\n${this.subroutine.compileXml()}<symbol> ; </symbol>\n</doStatement>\n`;
     }
 }
 
 class ReturnStatement {
     constructor(tokens) {
         this.tokens = tokens;
+        this.compile()
     }
 
     compile() {
-
+        if (this.tokens.length) this.expression = new Expression(this.tokens);
     }
 
     compileXml() {
         let output = '<returnStatement>\n<keyword> return </keyword>\n';
-        if (this.tokens.length) output += `<expression>\n<term>\n<identifier> ${this.tokens[0].value} </identifier>\n</term>\n</expression>\n`;
+        if (this.expression) output += this.expression.compileXml();
         output += '<symbol> ; </symbol>\n</returnStatement>\n';
         return output;
     }
