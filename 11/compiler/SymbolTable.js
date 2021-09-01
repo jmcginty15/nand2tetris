@@ -1,12 +1,15 @@
 class SymbolTable {
-    constructor () {
+    constructor(className) {
+        this.class = className;
+        this.subroutine = null;
         this.classScope = [];
         this.subroutineScope = [];
         this.classIndices = { static: 0, field: 0 };
         this.subroutineIndices = { argument: 0, var: 0 };
+        this.statementIndices = { while: 0, if: 0 };
     }
 
-    define (name, type, kind) {
+    define(name, type, kind) {
         const def = { name: name, type: type, kind: kind };
         if (['static', 'field'].includes(kind)) {
             def.num = this.classIndices[kind];
@@ -19,10 +22,19 @@ class SymbolTable {
         }
     }
 
-    get (name) {
+    get(name) {
         for (let def of this.subroutineScope) if (def.name === name) return def;
         for (let def of this.classScope) if (def.name === name) return def;
         return null;
+    }
+
+    clearSubroutineScope() {
+        this.subroutineScope.length = 0;
+        this.subroutineIndices.argument = 0;
+        this.subroutineIndices.var = 0;
+        this.statementIndices.while = 0;
+        this.statementIndices.if = 0;
+        this.subroutine = null;
     }
 }
 

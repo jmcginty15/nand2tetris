@@ -23,6 +23,10 @@ class VarDec {
         output += '<symbol> ; </symbol>\n</varDec>\n';
         return output;
     }
+
+    compileVm(symbolTable) {
+        for (let varName of this.varNames) symbolTable.define(varName, this.type, 'var');
+    }
 }
 
 module.exports = VarDec;

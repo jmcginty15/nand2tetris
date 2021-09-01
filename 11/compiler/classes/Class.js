@@ -4,10 +4,11 @@ const SymbolTable = require('../SymbolTable');
 const { VAR_DEC_KEYWORDS, SUBROUTINE_DEC_KEYWORDS } = require('./constants');
 
 class Class {
-    constructor(className, tokens) {
+    constructor(className, tokens, voidFunctions) {
         this.className = className;
         this.tokens = tokens;
-        this.symbolTable = new SymbolTable();
+        this.symbolTable = new SymbolTable(className);
+        this.voidFunctions = voidFunctions;
         this.compile();
     }
 
@@ -28,7 +29,7 @@ class Class {
         }
 
         while (index < this.tokens.length && SUBROUTINE_DEC_KEYWORDS.includes(this.tokens[index].value)) {
-            const nextSubroutineDec = new ClassSubroutineDec(this.tokens[index].value, this.tokens[index + 1].value, this.tokens[index + 2].value);
+            const nextSubroutineDec = new ClassSubroutineDec(this.tokens[index].value, this.tokens[index + 1].value, this.tokens[index + 2].value, this.voidFunctions);
             index += 4;
             let endIndex = index;
             while (this.tokens[endIndex].value !== ')') endIndex++;
@@ -58,10 +59,14 @@ class Class {
         return output;
     }
 
-    compileVm() {
+    compileVm(voidFunctions) {
         let output = '';
         // for (let varDec of this.varDecs) output += varDec.compileVm(this.symbolTable);
-        for (let subroutineDec of this.subroutineDecs) output += subroutineDec.compileVm(this.className, this.symbolTable);
+        for (let subroutineDec of this.subroutineDecs) {
+            this.symbolTable.subroutine = subroutineDec.subroutineName;
+            output += subroutineDec.compileVm(this.className, this.symbolTable);
+            this.symbolTable.clearSubroutineScope();
+        }
         return output;
     }
 }

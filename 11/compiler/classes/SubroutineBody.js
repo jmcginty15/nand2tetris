@@ -3,8 +3,9 @@ const Statement = require('./statements');
 const { STATEMENT_KEYWORDS } = require('./constants');
 
 class SubroutineBody {
-    constructor(tokens) {
+    constructor(tokens, voidFunctions) {
         this.tokens = tokens;
+        this.voidFunctions = voidFunctions;
         this.compile();
     }
 
@@ -34,7 +35,7 @@ class SubroutineBody {
                 endIndex++;
             }
             const statementBody = this.tokens.slice(index + 1, endIndex);
-            statements.push(new Statement(this.tokens[index].value, statementBody));
+            statements.push(new Statement(this.tokens[index].value, statementBody, this.voidFunctions));
             index = endIndex;
         }
 
@@ -51,13 +52,23 @@ class SubroutineBody {
         return output;
     }
 
-    compileVm(symbolTable) {
+    compileVm(symbolTable, isVoid) {
         let output = '';
-        // for (let varDec of this.varDecs) output += varDec.compileVm();
-        for (let statement of this.statements) output += statement.compileVm(symbolTable);
-        // console.log(this);
-        // console.log(symbolTable);
+        for (let varDec of this.varDecs) varDec.compileVm(symbolTable);
+        let index = 0;
+        while (index < this.statements.length) {
+            const nextStatement = this.statements[index];
+            if (isVoid && nextStatement.keyword === 'return') output += 'push constant 0\n';
+            output += nextStatement.compileVm(symbolTable);
+            index++;
+        }
         return output;
+    }
+
+    countLocals() {
+        let locals = 0;
+        for (let varDec of this.varDecs) locals += varDec.varNames.length;
+        return locals;
     }
 }
 

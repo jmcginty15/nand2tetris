@@ -25,7 +25,6 @@ class ParameterList {
 
     compileVm(symbolTable) {
         for (let parameter of this.parameters) symbolTable.define(parameter.varName, parameter.type, 'argument');
-        return this.parameters.length;
     }
 }
 

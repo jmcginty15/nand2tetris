@@ -1,10 +1,11 @@
 const { KEYWORD_CONSTANTS, OPERATORS, UNARY_OPERATORS } = require('./constants');
 
 class SubroutineCall {
-    constructor(className, subroutineName, tokens) {
+    constructor(className, subroutineName, tokens, voidFunctions) {
         this.className = className;
         this.subroutineName = subroutineName;
         this.tokens = tokens;
+        this.voidFunctions = voidFunctions;
         this.compile();
     }
 
@@ -14,7 +15,7 @@ class SubroutineCall {
         while (index < this.tokens.length) {
             let endIndex = index;
             while (endIndex < this.tokens.length && this.tokens[endIndex].value !== ',') endIndex++;
-            const expression = new Expression(this.tokens.slice(index, endIndex));
+            const expression = new Expression(this.tokens.slice(index, endIndex), this.voidFunctions);
             expressions.push(expression);
             index = endIndex + 1;
         }
@@ -35,13 +36,15 @@ class SubroutineCall {
         let output = '';
         for (let expression of this.expressions) output += expression.compileVm(symbolTable);
         output += `call ${this.className}.${this.subroutineName} ${this.expressions.length}\n`;
+        if (this.voidFunctions.includes(`${this.className}.${this.subroutineName}`)) output += 'pop temp 0\n';
         return output;
     }
 }
 
 class Expression {
-    constructor(tokens) {
+    constructor(tokens, voidFunctions) {
         this.tokens = tokens;
+        this.voidFunctions = voidFunctions;
         this.compile();
     }
 
@@ -50,17 +53,17 @@ class Expression {
         let index = 0;
         const tokens = this.tokens
 
-        while (index < this.tokens.length) pieces.push(getNextPiece());
+        while (index < this.tokens.length) pieces.push(getNextPiece(this.voidFunctions));
 
         this.pieces = pieces;
 
-        function getNextPiece() {
+        function getNextPiece(voidFunctions) {
             if (['integerConstant', 'stringConstant'].includes(tokens[index].type)) {
-                const term = new Term(tokens[index].type, tokens[index].value);
+                const term = new Term(tokens[index].type, tokens[index].value, voidFunctions);
                 index++;
                 return { type: 'term', value: term };
             } else if (KEYWORD_CONSTANTS.includes(tokens[index].value)) {
-                const term = new Term('keywordConstant', tokens[index].value);
+                const term = new Term('keywordConstant', tokens[index].value, voidFunctions);
                 index++;
                 return { type: 'term', value: term };
             } else if (OPERATORS.includes(tokens[index].value)) {
@@ -68,7 +71,7 @@ class Expression {
                     if (tokens[index].value !== '-' || pieces.length === 0 || pieces[pieces.length - 1].type === 'operator') {
                         const operator = tokens[index].value;
                         index++;
-                        const term = getNextPiece();
+                        const term = getNextPiece(voidFunctions);
                         term.value.applyUnaryOperator(operator);
                         return term;
                     } else {
@@ -91,7 +94,7 @@ class Expression {
                         else if (tokens[endIndex].value === ']') braceDiff--;
                     }
                     endIndex++;
-                    const term = new Term('arrayName', tokens.slice(index, endIndex));
+                    const term = new Term('arrayName', tokens.slice(index, endIndex), voidFunctions);
                     index = endIndex;
                     return { type: 'term', value: term };
                 } else if (index + 1 < tokens.length && (tokens[index + 1].value === '.' || tokens[index + 1].value === '(')) {
@@ -103,11 +106,11 @@ class Expression {
                         else if (tokens[endIndex].value === ')') braceDiff--;
                     }
                     endIndex++;
-                    const term = new Term('subroutineCall', tokens.slice(index, endIndex));
+                    const term = new Term('subroutineCall', tokens.slice(index, endIndex), voidFunctions);
                     index = endIndex;
                     return { type: 'term', value: term };
                 } else {
-                    const term = new Term('varName', tokens[index].value);
+                    const term = new Term('varName', tokens[index].value, voidFunctions);
                     index++;
                     return { type: 'term', value: term };
                 }
@@ -120,7 +123,7 @@ class Expression {
                     else if (tokens[endIndex].value === ')') braceDiff--;
                 }
                 endIndex++;
-                const term = new Term('expression', tokens.slice(index, endIndex));
+                const term = new Term('expression', tokens.slice(index, endIndex), voidFunctions);
                 index = endIndex;
                 return { type: 'term', value: term };
             }
@@ -152,8 +155,7 @@ class Expression {
                         output += 'add\n';
                         break;
                     case '-':
-                        if (index === 0 || this.pieces[index - 1].type === 'operator') output += 'neg\n';
-                        else output += 'sub\n';
+                        output += 'sub\n';
                         break;
                     case '*':
                         output += 'call Math.multiply 2\n';
@@ -161,23 +163,20 @@ class Expression {
                     case '/':
                         output += 'call Math.divide 2\n';
                         break;
-                    case '&':
+                    case '&amp;':
                         output += 'and\n';
                         break;
                     case '|':
                         output += 'or\n';
                         break;
-                    case '<':
+                    case '&lt;':
                         output += 'lt\n';
                         break;
-                    case '>':
+                    case '&gt;':
                         output += 'gt\n';
                         break;
                     case '=':
                         output += 'eq\n';
-                        break;
-                    case '~':
-                        output += 'not\n';
                         break;
                 }
                 index += 2;
@@ -188,9 +187,10 @@ class Expression {
 }
 
 class Term {
-    constructor(type, tokens) {
+    constructor(type, tokens, voidFunctions) {
         this.type = type;
         this.tokens = tokens;
+        this.voidFunctions = voidFunctions;
         this.compile();
     }
 
@@ -198,7 +198,7 @@ class Term {
         if (['integerConstant', 'stringConstant', 'keywordConstant', 'varName'].includes(this.type)) this.value = this.tokens;
         else if (this.type === 'arrayName') {
             this.value = this.tokens[0].value;
-            this.expression = new Expression(this.tokens.slice(2, this.tokens.length - 1));
+            this.expression = new Expression(this.tokens.slice(2, this.tokens.length - 1), this.voidFunctions);
         } else if (this.type === 'subroutineCall') {
             let index = 0;
             let className = null;
@@ -208,8 +208,8 @@ class Term {
             }
             const subroutineName = this.tokens[index].value;
             const tokens = this.tokens.slice(index + 2, this.tokens.length - 1);
-            this.value = new SubroutineCall(className, subroutineName, tokens);
-        } else if (this.type === 'expression') this.expression = new Expression(this.tokens.slice(1, this.tokens.length - 1));
+            this.value = new SubroutineCall(className, subroutineName, tokens, this.voidFunctions);
+        } else if (this.type === 'expression') this.expression = new Expression(this.tokens.slice(1, this.tokens.length - 1), this.voidFunctions);
     }
 
     applyUnaryOperator(operator) {
@@ -231,8 +231,25 @@ class Term {
     }
 
     compileVm(symbolTable) {
-        if (this.type === 'expression') return this.expression.compileVm(symbolTable);
-        else return `push constant ${this.value}\n`;
+        let output = '';
+        if (this.type === 'expression') output += this.expression.compileVm(symbolTable);
+        else if (['integerConstant', 'stringConstant'].includes(this.type)) output += `push constant ${this.value}\n`;
+        else if (this.type === 'keywordConstant') {
+            if (this.value === 'false' || this.value === 'null') output += 'push constant 0\n';
+            else if (this.value === 'true') output += 'push constant 1\nneg\n';
+        } else if (this.type === 'varName') {
+            const variable = symbolTable.get(this.value);
+            let segment = 'static';
+            if (variable.kind === 'var') segment = 'local';
+            else if (variable.kind === 'argument') segment = 'argument';
+            output += `push ${segment} ${variable.num}\n`;
+        } else if (this.type === 'arrayName') console.log('butthole');
+        else if (this.type === 'subroutineCall') output += this.value.compileVm(symbolTable);
+        else if (this.type === 'expression') console.log('butthole');
+
+        if (this.operator === '-') output += 'neg\n';
+        else if (this.operator === '~') output += 'not\n';
+        return output;
     }
 }
 
