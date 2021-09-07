@@ -28,6 +28,10 @@ class SymbolTable {
         return null;
     }
 
+    countFields() {
+        return this.classIndices.field;
+    }
+
     clearSubroutineScope() {
         this.subroutineScope.length = 0;
         this.subroutineIndices.argument = 0;

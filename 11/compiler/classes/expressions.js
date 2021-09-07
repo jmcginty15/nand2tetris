@@ -1,11 +1,10 @@
 const { KEYWORD_CONSTANTS, OPERATORS, UNARY_OPERATORS } = require('./constants');
 
 class SubroutineCall {
-    constructor(className, subroutineName, tokens, voidFunctions) {
+    constructor(className, subroutineName, tokens) {
         this.className = className;
         this.subroutineName = subroutineName;
         this.tokens = tokens;
-        this.voidFunctions = voidFunctions;
         this.compile();
     }
 
@@ -15,7 +14,7 @@ class SubroutineCall {
         while (index < this.tokens.length) {
             let endIndex = index;
             while (endIndex < this.tokens.length && this.tokens[endIndex].value !== ',') endIndex++;
-            const expression = new Expression(this.tokens.slice(index, endIndex), this.voidFunctions);
+            const expression = new Expression(this.tokens.slice(index, endIndex));
             expressions.push(expression);
             index = endIndex + 1;
         }
@@ -34,17 +33,30 @@ class SubroutineCall {
 
     compileVm(symbolTable) {
         let output = '';
+        let className = null;
+        let args = this.expressions.length;
+        if (this.className) {
+            const variable = symbolTable.get(this.className);
+            if (variable) {
+                className = variable.type;
+                const instance = new Term('varName', variable.name);
+                output += instance.compileVm(symbolTable);
+                args++;
+            } else className = this.className;
+        } else {
+            className = symbolTable.class;
+            output += 'push pointer 0\n';
+            args++;
+        }
         for (let expression of this.expressions) output += expression.compileVm(symbolTable);
-        output += `call ${this.className}.${this.subroutineName} ${this.expressions.length}\n`;
-        if (this.voidFunctions.includes(`${this.className}.${this.subroutineName}`)) output += 'pop temp 0\n';
+        output += `call ${className}.${this.subroutineName} ${args}\n`;
         return output;
     }
 }
 
 class Expression {
-    constructor(tokens, voidFunctions) {
+    constructor(tokens) {
         this.tokens = tokens;
-        this.voidFunctions = voidFunctions;
         this.compile();
     }
 
@@ -53,17 +65,17 @@ class Expression {
         let index = 0;
         const tokens = this.tokens
 
-        while (index < this.tokens.length) pieces.push(getNextPiece(this.voidFunctions));
+        while (index < this.tokens.length) pieces.push(getNextPiece());
 
         this.pieces = pieces;
 
-        function getNextPiece(voidFunctions) {
+        function getNextPiece() {
             if (['integerConstant', 'stringConstant'].includes(tokens[index].type)) {
-                const term = new Term(tokens[index].type, tokens[index].value, voidFunctions);
+                const term = new Term(tokens[index].type, tokens[index].value);
                 index++;
                 return { type: 'term', value: term };
             } else if (KEYWORD_CONSTANTS.includes(tokens[index].value)) {
-                const term = new Term('keywordConstant', tokens[index].value, voidFunctions);
+                const term = new Term('keywordConstant', tokens[index].value);
                 index++;
                 return { type: 'term', value: term };
             } else if (OPERATORS.includes(tokens[index].value)) {
@@ -71,7 +83,7 @@ class Expression {
                     if (tokens[index].value !== '-' || pieces.length === 0 || pieces[pieces.length - 1].type === 'operator') {
                         const operator = tokens[index].value;
                         index++;
-                        const term = getNextPiece(voidFunctions);
+                        const term = getNextPiece();
                         term.value.applyUnaryOperator(operator);
                         return term;
                     } else {
@@ -94,7 +106,7 @@ class Expression {
                         else if (tokens[endIndex].value === ']') braceDiff--;
                     }
                     endIndex++;
-                    const term = new Term('arrayName', tokens.slice(index, endIndex), voidFunctions);
+                    const term = new Term('arrayName', tokens.slice(index, endIndex));
                     index = endIndex;
                     return { type: 'term', value: term };
                 } else if (index + 1 < tokens.length && (tokens[index + 1].value === '.' || tokens[index + 1].value === '(')) {
@@ -106,11 +118,11 @@ class Expression {
                         else if (tokens[endIndex].value === ')') braceDiff--;
                     }
                     endIndex++;
-                    const term = new Term('subroutineCall', tokens.slice(index, endIndex), voidFunctions);
+                    const term = new Term('subroutineCall', tokens.slice(index, endIndex));
                     index = endIndex;
                     return { type: 'term', value: term };
                 } else {
-                    const term = new Term('varName', tokens[index].value, voidFunctions);
+                    const term = new Term('varName', tokens[index].value);
                     index++;
                     return { type: 'term', value: term };
                 }
@@ -123,7 +135,7 @@ class Expression {
                     else if (tokens[endIndex].value === ')') braceDiff--;
                 }
                 endIndex++;
-                const term = new Term('expression', tokens.slice(index, endIndex), voidFunctions);
+                const term = new Term('expression', tokens.slice(index, endIndex));
                 index = endIndex;
                 return { type: 'term', value: term };
             }
@@ -187,10 +199,9 @@ class Expression {
 }
 
 class Term {
-    constructor(type, tokens, voidFunctions) {
+    constructor(type, tokens) {
         this.type = type;
         this.tokens = tokens;
-        this.voidFunctions = voidFunctions;
         this.compile();
     }
 
@@ -198,7 +209,7 @@ class Term {
         if (['integerConstant', 'stringConstant', 'keywordConstant', 'varName'].includes(this.type)) this.value = this.tokens;
         else if (this.type === 'arrayName') {
             this.value = this.tokens[0].value;
-            this.expression = new Expression(this.tokens.slice(2, this.tokens.length - 1), this.voidFunctions);
+            this.expression = new Expression(this.tokens.slice(2, this.tokens.length - 1));
         } else if (this.type === 'subroutineCall') {
             let index = 0;
             let className = null;
@@ -208,8 +219,8 @@ class Term {
             }
             const subroutineName = this.tokens[index].value;
             const tokens = this.tokens.slice(index + 2, this.tokens.length - 1);
-            this.value = new SubroutineCall(className, subroutineName, tokens, this.voidFunctions);
-        } else if (this.type === 'expression') this.expression = new Expression(this.tokens.slice(1, this.tokens.length - 1), this.voidFunctions);
+            this.value = new SubroutineCall(className, subroutineName, tokens);
+        } else if (this.type === 'expression') this.expression = new Expression(this.tokens.slice(1, this.tokens.length - 1));
     }
 
     applyUnaryOperator(operator) {
@@ -236,12 +247,14 @@ class Term {
         else if (['integerConstant', 'stringConstant'].includes(this.type)) output += `push constant ${this.value}\n`;
         else if (this.type === 'keywordConstant') {
             if (this.value === 'false' || this.value === 'null') output += 'push constant 0\n';
-            else if (this.value === 'true') output += 'push constant 1\nneg\n';
+            else if (this.value === 'true') output += 'push constant 1\nnot\n';
+            else if (this.value === 'this') output += 'push pointer 0\n';
         } else if (this.type === 'varName') {
             const variable = symbolTable.get(this.value);
             let segment = 'static';
             if (variable.kind === 'var') segment = 'local';
             else if (variable.kind === 'argument') segment = 'argument';
+            else if (variable.kind === 'field') segment = 'this';
             output += `push ${segment} ${variable.num}\n`;
         } else if (this.type === 'arrayName') console.log('butthole');
         else if (this.type === 'subroutineCall') output += this.value.compileVm(symbolTable);

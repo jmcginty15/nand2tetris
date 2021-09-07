@@ -25,9 +25,8 @@ class ClassVarDec {
         return output;
     }
 
-    compileVm() {
-        console.log('hole');
-        console.log(this.varType, this.type, this.varNames);
+    compileVm(symbolTable) {
+        for (let varName of this.varNames) symbolTable.define(varName, this.type, 'field');
     }
 }
 

@@ -12,11 +12,9 @@ class JackAnalyzer {
         if (this.path.slice(-5) === '.jack') {
             this.filename = this.path.slice(0, -5);
             const file = fs.readFileSync(this.path, 'utf-8');
-            const tokenized = tokenize(file);
-            this.tokens = tokenized.tokens;
-            this.voidFunctions = tokenized.voidFunctions;
+            this.tokens = tokenize(file);
             this.outputTokens();
-            const compiledTokens = compileTokens(this.tokens, this.voidFunctions);
+            const compiledTokens = compileTokens(this.tokens);
             this.xml = compiledTokens.xml;
             this.vm = compiledTokens.vm;
             this.outputXml();

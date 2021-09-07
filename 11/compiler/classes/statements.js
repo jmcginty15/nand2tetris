@@ -2,10 +2,9 @@ const { SubroutineCall, Expression } = require('./expressions');
 const { STATEMENT_KEYWORDS } = require('./constants');
 
 class Statement {
-    constructor(keyword, tokens, voidFunctions) {
+    constructor(keyword, tokens) {
         this.keyword = keyword;
         this.tokens = tokens;
-        this.voidFunctions = voidFunctions;
         this.compile();
     }
 
@@ -26,7 +25,7 @@ class Statement {
                 var endIndex = index;
                 while (this.tokens[endIndex].value !== ';') endIndex++;
                 const expression = this.tokens.slice(index, endIndex);
-                this.statement = new LetStatement(varName, arrayIndexExpression, expression, this.voidFunctions);
+                this.statement = new LetStatement(varName, arrayIndexExpression, expression);
                 break;
             case 'if':
                 var braceDiff = 1;
@@ -63,7 +62,7 @@ class Statement {
                     elseBody = this.tokens.slice(index + 1, endIndex);
                 }
 
-                this.statement = new IfStatement(ifCondition, ifBody, elseBody, this.voidFunctions);
+                this.statement = new IfStatement(ifCondition, ifBody, elseBody);
                 break;
             case 'while':
                 var braceDiff = 1;
@@ -85,15 +84,15 @@ class Statement {
                 }
                 const whileBody = this.tokens.slice(index + 1, endIndex);
 
-                this.statement = new WhileStatement(whileCondition, whileBody, this.voidFunctions);
+                this.statement = new WhileStatement(whileCondition, whileBody);
                 break;
             case 'do':
-                this.statement = new DoStatement(this.tokens, this.voidFunctions);
+                this.statement = new DoStatement(this.tokens);
                 break;
             case 'return':
                 var endIndex = index;
                 while (this.tokens[endIndex].value !== ';') endIndex++;
-                this.statement = new ReturnStatement(this.tokens.slice(index, endIndex), this.voidFunctions);
+                this.statement = new ReturnStatement(this.tokens.slice(index, endIndex));
                 break;
         }
     }
@@ -108,17 +107,16 @@ class Statement {
 }
 
 class LetStatement {
-    constructor(varName, arrayIndexTokens, expressionTokens, voidFunctions) {
+    constructor(varName, arrayIndexTokens, expressionTokens) {
         this.varName = varName;
         this.arrayIndexTokens = arrayIndexTokens;
         this.expressionTokens = expressionTokens;
-        this.voidFunctions = voidFunctions;
         this.compile();
     }
 
     compile() {
-        if (this.arrayIndexTokens) this.arrayIndexExpression = new Expression(this.arrayIndexTokens, this.voidFunctions);
-        this.expression = new Expression(this.expressionTokens, this.voidFunctions);
+        if (this.arrayIndexTokens) this.arrayIndexExpression = new Expression(this.arrayIndexTokens);
+        this.expression = new Expression(this.expressionTokens);
     }
 
     compileXml() {
@@ -134,17 +132,17 @@ class LetStatement {
         let segment = 'static';
         if (variable.kind === 'var') segment = 'local';
         else if (variable.kind === 'argument') segment = 'argument';
+        else if (variable.kind === 'field') segment = 'this';
         output += `pop ${segment} ${variable.num}\n`;
         return output;
     }
 }
 
 class IfStatement {
-    constructor(conditionTokens, ifTokens, elseTokens, voidFunctions) {
+    constructor(conditionTokens, ifTokens, elseTokens) {
         this.conditionTokens = conditionTokens;
         this.ifTokens = ifTokens;
         this.elseTokens = elseTokens;
-        this.voidFunctions = voidFunctions;
         this.compile();
     }
 
@@ -163,7 +161,7 @@ class IfStatement {
                 endIndex++;
             }
             const statementBody = this.ifTokens.slice(index + 1, endIndex);
-            ifStatements.push(new Statement(this.ifTokens[index].value, statementBody, this.voidFunctions));
+            ifStatements.push(new Statement(this.ifTokens[index].value, statementBody));
             index = endIndex;
         }
 
@@ -180,12 +178,12 @@ class IfStatement {
                     endIndex++;
                 }
                 const statementBody = this.elseTokens.slice(index + 1, endIndex);
-                elseStatements.push(new Statement(this.elseTokens[index].value, statementBody, this.voidFunctions));
+                elseStatements.push(new Statement(this.elseTokens[index].value, statementBody));
                 index = endIndex;
             }
         }
 
-        this.condition = new Expression(this.conditionTokens, this.voidFunctions);
+        this.condition = new Expression(this.conditionTokens);
         this.ifStatements = ifStatements;
         this.elseStatements = elseStatements;
     }
@@ -207,9 +205,9 @@ class IfStatement {
         const label = `${symbolTable.class}.${symbolTable.subroutine}.if_${symbolTable.statementIndices.if}_`;
         symbolTable.statementIndices.if++;
         let output = this.condition.compileVm(symbolTable);
-        output += `not\nif-goto ${label}else\n`;
+        output += `not\nif-goto ${label}${this.elseTokens ? 'else' : 'end'}\n`;
         for (let statement of this.ifStatements) output += statement.compileVm(symbolTable);
-        output += `goto ${label}end\nlabel ${label}else\n`;
+        if (this.elseTokens) output += `goto ${label}end\nlabel ${label}else\n`;
         for (let statement of this.elseStatements) output += statement.compileVm(symbolTable);
         output += `label ${label}end\n`;
         return output;
@@ -217,10 +215,9 @@ class IfStatement {
 }
 
 class WhileStatement {
-    constructor(conditionTokens, tokens, voidFunctions) {
+    constructor(conditionTokens, tokens) {
         this.conditionTokens = conditionTokens;
         this.tokens = tokens;
-        this.voidFunctions = voidFunctions;
         this.compile();
     }
 
@@ -238,11 +235,11 @@ class WhileStatement {
                 endIndex++;
             }
             const statementBody = this.tokens.slice(index + 1, endIndex);
-            statements.push(new Statement(this.tokens[index].value, statementBody, this.voidFunctions));
+            statements.push(new Statement(this.tokens[index].value, statementBody));
             index = endIndex;
         }
 
-        this.condition = new Expression(this.conditionTokens, this.voidFunctions);
+        this.condition = new Expression(this.conditionTokens);
         this.statements = statements;
     }
 
@@ -267,9 +264,8 @@ class WhileStatement {
 }
 
 class DoStatement {
-    constructor(tokens, voidFunctions) {
+    constructor(tokens) {
         this.tokens = tokens;
-        this.voidFunctions = voidFunctions;
         this.compile();
     }
 
@@ -283,27 +279,26 @@ class DoStatement {
         const subroutineName = this.tokens[index].value;
 
         while (this.tokens[index].value !== '(') index++;
-        this.subroutine = new SubroutineCall(className, subroutineName, this.tokens.slice(index + 1, this.tokens.length - 2), this.voidFunctions);
+        this.subroutine = new SubroutineCall(className, subroutineName, this.tokens.slice(index + 1, this.tokens.length - 2));
     }
 
     compileXml() {
         return `<doStatement>\n<keyword> do </keyword>\n${this.subroutine.compileXml()}<symbol> ; </symbol>\n</doStatement>\n`;
     }
 
-    compileVm(symbolTable, voidFunctions) {
-        return this.subroutine.compileVm(symbolTable, voidFunctions);
+    compileVm(symbolTable) {
+        return `${this.subroutine.compileVm(symbolTable)}pop temp 0\n`;
     }
 }
 
 class ReturnStatement {
-    constructor(tokens, voidFunctions) {
+    constructor(tokens) {
         this.tokens = tokens;
-        this.voidFunctions = voidFunctions;
         this.compile()
     }
 
     compile() {
-        if (this.tokens.length) this.expression = new Expression(this.tokens, this.voidFunctions);
+        if (this.tokens.length) this.expression = new Expression(this.tokens);
     }
 
     compileXml() {

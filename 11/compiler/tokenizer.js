@@ -5,37 +5,6 @@ const IDENT_REGEX = /[a-zA-Z0-9_]/;
 const STRING_CONTAINER = '"';
 const WHITESPACE = [' ', '\r', '\f', '\v', '\n', '\t'];
 
-const voidFunctions = [
-    'Math.init',
-    'String.dispose',
-    'String.setCharAt',
-    'String.eraseLastChar',
-    'String.setInt',
-    'Array.dispose',
-    'Output.init',
-    'Output.moveCursor',
-    'Output.printChar',
-    'Output.printString',
-    'Output.printInt',
-    'Output.println',
-    'Output.backSpace',
-    'Screen.init',
-    'Screen.clearScreen',
-    'Screen.setColor',
-    'Screen.drawPixel',
-    'Screen.drawLine',
-    'Screen.drawRectangle',
-    'Screen.drawCircle',
-    'Keyboard.init',
-    'Memory.init',
-    'Memory.poke',
-    'Memory.deAlloc',
-    'Sys.init',
-    'Sys.halt',
-    'Sys.error',
-    'Sys.wait'
-];
-
 function tokenize(file) {
     const tokens = [];
     let index = 0;
@@ -109,12 +78,7 @@ function tokenize(file) {
         }
     }
 
-    for (let i = 0; i < tokens.length; i++) if (tokens[i].value === 'void') voidFunctions.push(`${tokens[1].value}.${tokens[i + 1].value}`);
-
-    return {
-        tokens: tokens,
-        voidFunctions: voidFunctions
-    }
+    return tokens;
 }
 
 module.exports = tokenize;

@@ -2,11 +2,10 @@ const ParameterList = require('./ParameterList');
 const SubroutineBody = require('./SubroutineBody');
 
 class ClassSubroutineDec {
-    constructor(subroutineType, type, subroutineName, voidFunctions) {
+    constructor(subroutineType, type, subroutineName) {
         this.subroutineType = subroutineType;
         this.type = type;
         this.subroutineName = subroutineName;
-        this.voidFunctions = voidFunctions;
     }
 
     addParameterList(parameterListTokens) {
@@ -14,7 +13,7 @@ class ClassSubroutineDec {
     }
 
     addBody(bodyTokens) {
-        this.body = new SubroutineBody(bodyTokens, this.voidFunctions);
+        this.body = new SubroutineBody(bodyTokens);
     }
 
     compileXml() {
@@ -26,8 +25,10 @@ class ClassSubroutineDec {
     }
 
     compileVm(className, symbolTable) {
-        this.parameterList.compileVm(symbolTable)
+        this.parameterList.compileVm(symbolTable);
         let output = `function ${className}.${this.subroutineName} ${this.body.countLocals()}\n`;
+        if (this.subroutineType === 'constructor') output += `push constant ${symbolTable.countFields()}\ncall Memory.alloc 1\npop pointer 0\n`;
+        else if (this.subroutineType === 'method') output += 'push argument 0\npop pointer 0\n';
         const isVoid = this.type === 'void' ? true : false;
         output += this.body.compileVm(symbolTable, isVoid);
         return output;

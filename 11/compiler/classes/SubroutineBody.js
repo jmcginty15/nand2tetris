@@ -3,9 +3,8 @@ const Statement = require('./statements');
 const { STATEMENT_KEYWORDS } = require('./constants');
 
 class SubroutineBody {
-    constructor(tokens, voidFunctions) {
+    constructor(tokens) {
         this.tokens = tokens;
-        this.voidFunctions = voidFunctions;
         this.compile();
     }
 
@@ -35,7 +34,7 @@ class SubroutineBody {
                 endIndex++;
             }
             const statementBody = this.tokens.slice(index + 1, endIndex);
-            statements.push(new Statement(this.tokens[index].value, statementBody, this.voidFunctions));
+            statements.push(new Statement(this.tokens[index].value, statementBody));
             index = endIndex;
         }
 
