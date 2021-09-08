@@ -244,10 +244,13 @@ class Term {
     compileVm(symbolTable) {
         let output = '';
         if (this.type === 'expression') output += this.expression.compileVm(symbolTable);
-        else if (['integerConstant', 'stringConstant'].includes(this.type)) output += `push constant ${this.value}\n`;
-        else if (this.type === 'keywordConstant') {
+        else if (this.type === 'integerConstant') output += `push constant ${this.value}\n`;
+        else if (this.type === 'stringConstant') {
+            output += `push constant ${this.value.length}\ncall String.new 1\n`;
+            for (let i = 0; i < this.value.length; i++) output += `push constant ${this.value.charCodeAt(i)}\ncall String.appendChar 2\n`;
+        } else if (this.type === 'keywordConstant') {
             if (this.value === 'false' || this.value === 'null') output += 'push constant 0\n';
-            else if (this.value === 'true') output += 'push constant 1\nnot\n';
+            else if (this.value === 'true') output += 'push constant 1\nneg\n';
             else if (this.value === 'this') output += 'push pointer 0\n';
         } else if (this.type === 'varName') {
             const variable = symbolTable.get(this.value);
@@ -256,9 +259,14 @@ class Term {
             else if (variable.kind === 'argument') segment = 'argument';
             else if (variable.kind === 'field') segment = 'this';
             output += `push ${segment} ${variable.num}\n`;
-        } else if (this.type === 'arrayName') console.log('butthole');
-        else if (this.type === 'subroutineCall') output += this.value.compileVm(symbolTable);
-        else if (this.type === 'expression') console.log('butthole');
+        } else if (this.type === 'arrayName') {
+            const variable = symbolTable.get(this.value);
+            let segment = 'static';
+            if (variable.kind === 'var') segment = 'local';
+            else if (variable.kind === 'argument') segment = 'argument';
+            else if (variable.kind === 'field') segment = 'this';
+            output += `push ${segment} ${variable.num}\n${this.expression.compileVm(symbolTable)}add\npop pointer 1\npush that 0\n`;
+        } else if (this.type === 'subroutineCall') output += this.value.compileVm(symbolTable);
 
         if (this.operator === '-') output += 'neg\n';
         else if (this.operator === '~') output += 'not\n';

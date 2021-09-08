@@ -133,7 +133,8 @@ class LetStatement {
         if (variable.kind === 'var') segment = 'local';
         else if (variable.kind === 'argument') segment = 'argument';
         else if (variable.kind === 'field') segment = 'this';
-        output += `pop ${segment} ${variable.num}\n`;
+        if (variable.type === 'Array' && this.arrayIndexExpression) output += `push ${segment} ${variable.num}\n${this.arrayIndexExpression.compileVm(symbolTable)}add\npop pointer 1\npop that 0\n`;
+        else output += `pop ${segment} ${variable.num}\n`;
         return output;
     }
 }

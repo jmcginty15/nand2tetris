@@ -95,7 +95,7 @@ eq
 not
 if-goto SquareGame.run.if_0_end
 push constant 1
-not
+neg
 pop local 1
 label SquareGame.run.if_0_end
 push local 0
