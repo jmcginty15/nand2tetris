@@ -1,14 +1,14 @@
 <tokens>
-<keyword> class </keyword>
+<identifier> class </identifier>
 <identifier> Main </identifier>
 <symbol> { </symbol>
-<keyword> function </keyword>
-<keyword> void </keyword>
+<identifier> function </identifier>
+<identifier> void </identifier>
 <identifier> main </identifier>
 <symbol> ( </symbol>
 <symbol> ) </symbol>
 <symbol> { </symbol>
-<keyword> do </keyword>
+<identifier> do </identifier>
 <identifier> Output </identifier>
 <symbol> . </symbol>
 <identifier> printInt </identifier>
@@ -22,7 +22,7 @@
 <symbol> ) </symbol>
 <symbol> ) </symbol>
 <symbol> ; </symbol>
-<keyword> return </keyword>
+<identifier> return </identifier>
 <symbol> ; </symbol>
 <symbol> } </symbol>
 <symbol> } </symbol>

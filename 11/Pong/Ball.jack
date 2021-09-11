@@ -182,7 +182,7 @@ class Ball {
                 let newx = 0;
                 let newy = (divLengthy * 50) / divLengthx;
                 let newy = y + (newy * factor);
-	        }
+            }
 	        else {
                 if (wall = 3) {
 		            let newy = 250;
