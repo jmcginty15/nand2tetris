@@ -54,7 +54,7 @@ function tokenize(file) {
                 for (let keyword of KEYWORDS) {
                     const text = file.slice(index, index + keyword.length);
 
-                    if (text === keyword) {
+                    if (text === keyword && file.charAt(index + keyword.length + 1) === ' ') {
                         isKeyword = true;
                         tokens.push({ type: 'keyword', value: text });
                         index += keyword.length;

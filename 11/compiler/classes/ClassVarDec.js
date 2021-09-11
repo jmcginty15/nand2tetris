@@ -26,7 +26,7 @@ class ClassVarDec {
     }
 
     compileVm(symbolTable) {
-        for (let varName of this.varNames) symbolTable.define(varName, this.type, 'field');
+        for (let varName of this.varNames) symbolTable.define(varName, this.type, this.varType);
     }
 }
 

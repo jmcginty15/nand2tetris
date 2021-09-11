@@ -26,11 +26,15 @@ class ClassSubroutineDec {
 
     compileVm(className, symbolTable) {
         this.parameterList.compileVm(symbolTable);
+        let isMethod = false;
         let output = `function ${className}.${this.subroutineName} ${this.body.countLocals()}\n`;
         if (this.subroutineType === 'constructor') output += `push constant ${symbolTable.countFields()}\ncall Memory.alloc 1\npop pointer 0\n`;
-        else if (this.subroutineType === 'method') output += 'push argument 0\npop pointer 0\n';
+        else if (this.subroutineType === 'method') {
+            isMethod = true;
+            output += 'push argument 0\npop pointer 0\n';
+        }
         const isVoid = this.type === 'void' ? true : false;
-        output += this.body.compileVm(symbolTable, isVoid);
+        output += this.body.compileVm(symbolTable, isVoid, isMethod);
         return output;
     }
 }

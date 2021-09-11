@@ -51,14 +51,14 @@ class SubroutineBody {
         return output;
     }
 
-    compileVm(symbolTable, isVoid) {
+    compileVm(symbolTable, isVoid, isMethod) {
         let output = '';
         for (let varDec of this.varDecs) varDec.compileVm(symbolTable);
         let index = 0;
         while (index < this.statements.length) {
             const nextStatement = this.statements[index];
             if (isVoid && nextStatement.keyword === 'return') output += 'push constant 0\n';
-            output += nextStatement.compileVm(symbolTable);
+            output += nextStatement.compileVm(symbolTable, isMethod);
             index++;
         }
         return output;

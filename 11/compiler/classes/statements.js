@@ -15,9 +15,15 @@ class Statement {
                 const varName = this.tokens[index].value;
                 let arrayIndexExpression = null;
                 if (this.tokens[index + 1].value === '[') {
-                    var endIndex = index + 2;
-                    while (this.tokens[endIndex].value !== ']') endIndex++;
-                    arrayIndexExpression = this.tokens.slice(index + 2, endIndex);
+                    var endIndex = index + 1;
+                    var braceDiff = 1;
+                    while (braceDiff !== 0) {
+                        endIndex++;
+                        if (this.tokens[endIndex].value === '[') braceDiff++;
+                        else if (this.tokens[endIndex].value === ']') braceDiff--;
+                    }
+                    endIndex++;
+                    arrayIndexExpression = this.tokens.slice(index + 2, endIndex - 1);
                     index = endIndex;
                 }
                 while (this.tokens[index].value !== '=') index++;
@@ -101,8 +107,8 @@ class Statement {
         if (this.statement) return this.statement.compileXml();
     }
 
-    compileVm(symbolTable) {
-        if (this.statement) return this.statement.compileVm(symbolTable);
+    compileVm(symbolTable, isMethod) {
+        if (this.statement) return this.statement.compileVm(symbolTable, isMethod);
     }
 }
 
@@ -126,14 +132,14 @@ class LetStatement {
         return output;
     }
 
-    compileVm(symbolTable) {
-        let output = this.expression.compileVm(symbolTable);
+    compileVm(symbolTable, isMethod) {
+        let output = this.expression.compileVm(symbolTable, isMethod);
         const variable = symbolTable.get(this.varName);
         let segment = 'static';
         if (variable.kind === 'var') segment = 'local';
         else if (variable.kind === 'argument') segment = 'argument';
         else if (variable.kind === 'field') segment = 'this';
-        if (variable.type === 'Array' && this.arrayIndexExpression) output += `push ${segment} ${variable.num}\n${this.arrayIndexExpression.compileVm(symbolTable)}add\npop pointer 1\npop that 0\n`;
+        if (variable.type === 'Array' && this.arrayIndexExpression) output += `push ${segment} ${variable.num}\n${this.arrayIndexExpression.compileVm(symbolTable, isMethod)}add\npop pointer 1\npop that 0\n`;
         else output += `pop ${segment} ${variable.num}\n`;
         return output;
     }
@@ -202,14 +208,14 @@ class IfStatement {
         return output;
     }
 
-    compileVm(symbolTable) {
+    compileVm(symbolTable, isMethod) {
         const label = `${symbolTable.class}.${symbolTable.subroutine}.if_${symbolTable.statementIndices.if}_`;
         symbolTable.statementIndices.if++;
-        let output = this.condition.compileVm(symbolTable);
+        let output = this.condition.compileVm(symbolTable, isMethod);
         output += `not\nif-goto ${label}${this.elseTokens ? 'else' : 'end'}\n`;
-        for (let statement of this.ifStatements) output += statement.compileVm(symbolTable);
+        for (let statement of this.ifStatements) output += statement.compileVm(symbolTable, isMethod);
         if (this.elseTokens) output += `goto ${label}end\nlabel ${label}else\n`;
-        for (let statement of this.elseStatements) output += statement.compileVm(symbolTable);
+        for (let statement of this.elseStatements) output += statement.compileVm(symbolTable, isMethod);
         output += `label ${label}end\n`;
         return output;
     }
@@ -251,13 +257,13 @@ class WhileStatement {
         return output;
     }
 
-    compileVm(symbolTable) {
+    compileVm(symbolTable, isMethod) {
         const label = `${symbolTable.class}.${symbolTable.subroutine}.while_${symbolTable.statementIndices.while}_`;
         symbolTable.statementIndices.while++;
         let output = `label ${label}start\n`;
-        output += this.condition.compileVm(symbolTable);
+        output += this.condition.compileVm(symbolTable, isMethod);
         output += `not\nif-goto ${label}end\n`;
-        for (let statement of this.statements) output += statement.compileVm(symbolTable);
+        for (let statement of this.statements) output += statement.compileVm(symbolTable, isMethod);
         output += `goto ${label}start\n`;
         output += `label ${label}end\n`;
         return output;
@@ -287,8 +293,8 @@ class DoStatement {
         return `<doStatement>\n<keyword> do </keyword>\n${this.subroutine.compileXml()}<symbol> ; </symbol>\n</doStatement>\n`;
     }
 
-    compileVm(symbolTable) {
-        return `${this.subroutine.compileVm(symbolTable)}pop temp 0\n`;
+    compileVm(symbolTable, isMethod) {
+        return `${this.subroutine.compileVm(symbolTable, isMethod)}pop temp 0\n`;
     }
 }
 
@@ -309,9 +315,9 @@ class ReturnStatement {
         return output;
     }
 
-    compileVm(symbolTable) {
+    compileVm(symbolTable, isMethod) {
         let output = '';
-        if (this.expression) output += this.expression.compileVm(symbolTable);
+        if (this.expression) output += this.expression.compileVm(symbolTable, isMethod);
         output += 'return\n';
         return output;
     }

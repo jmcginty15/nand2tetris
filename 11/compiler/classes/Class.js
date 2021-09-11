@@ -64,7 +64,6 @@ class Class {
         for (let subroutineDec of this.subroutineDecs) {
             this.symbolTable.subroutine = subroutineDec.subroutineName;
             output += subroutineDec.compileVm(this.className, this.symbolTable);
-            // console.log(this.symbolTable);
             this.symbolTable.clearSubroutineScope();
         }
         return output;

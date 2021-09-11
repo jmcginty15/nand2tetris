@@ -31,7 +31,7 @@ class SubroutineCall {
         return output;
     }
 
-    compileVm(symbolTable) {
+    compileVm(symbolTable, isMethod) {
         let output = '';
         let className = null;
         let args = this.expressions.length;
@@ -40,7 +40,7 @@ class SubroutineCall {
             if (variable) {
                 className = variable.type;
                 const instance = new Term('varName', variable.name);
-                output += instance.compileVm(symbolTable);
+                output += instance.compileVm(symbolTable, isMethod);
                 args++;
             } else className = this.className;
         } else {
@@ -48,7 +48,7 @@ class SubroutineCall {
             output += 'push pointer 0\n';
             args++;
         }
-        for (let expression of this.expressions) output += expression.compileVm(symbolTable);
+        for (let expression of this.expressions) output += expression.compileVm(symbolTable, isMethod);
         output += `call ${className}.${this.subroutineName} ${args}\n`;
         return output;
     }
@@ -152,13 +152,13 @@ class Expression {
         return output;
     }
 
-    compileVm(symbolTable) {
+    compileVm(symbolTable, isMethod) {
         let output = '';
         let index = 0;
         while (index < this.pieces.length) {
             const piece = this.pieces[index];
             if (piece.type === 'term') {
-                output += piece.value.compileVm(symbolTable);
+                output += piece.value.compileVm(symbolTable, isMethod);
                 index++;
             } else if (piece.type === 'operator') {
                 output += this.pieces[index + 1].value.compileVm(symbolTable);
@@ -241,9 +241,9 @@ class Term {
         return output;
     }
 
-    compileVm(symbolTable) {
+    compileVm(symbolTable, isMethod) {
         let output = '';
-        if (this.type === 'expression') output += this.expression.compileVm(symbolTable);
+        if (this.type === 'expression') output += this.expression.compileVm(symbolTable, isMethod);
         else if (this.type === 'integerConstant') output += `push constant ${this.value}\n`;
         else if (this.type === 'stringConstant') {
             output += `push constant ${this.value.length}\ncall String.new 1\n`;
@@ -254,19 +254,25 @@ class Term {
             else if (this.value === 'this') output += 'push pointer 0\n';
         } else if (this.type === 'varName') {
             const variable = symbolTable.get(this.value);
+            let varNum = variable.num;
             let segment = 'static';
             if (variable.kind === 'var') segment = 'local';
-            else if (variable.kind === 'argument') segment = 'argument';
-            else if (variable.kind === 'field') segment = 'this';
-            output += `push ${segment} ${variable.num}\n`;
+            else if (variable.kind === 'argument') {
+                if (isMethod) varNum++;
+                segment = 'argument';
+            } else if (variable.kind === 'field') segment = 'this';
+            output += `push ${segment} ${varNum}\n`;
         } else if (this.type === 'arrayName') {
             const variable = symbolTable.get(this.value);
+            let varNum = variable.num;
             let segment = 'static';
             if (variable.kind === 'var') segment = 'local';
-            else if (variable.kind === 'argument') segment = 'argument';
-            else if (variable.kind === 'field') segment = 'this';
-            output += `push ${segment} ${variable.num}\n${this.expression.compileVm(symbolTable)}add\npop pointer 1\npush that 0\n`;
-        } else if (this.type === 'subroutineCall') output += this.value.compileVm(symbolTable);
+            else if (variable.kind === 'argument') {
+                if (isMethod) varNum++;
+                segment = 'argument';
+            } else if (variable.kind === 'field') segment = 'this';
+            output += `push ${segment} ${varNum}\n${this.expression.compileVm(symbolTable, isMethod)}add\npop pointer 1\npush that 0\n`;
+        } else if (this.type === 'subroutineCall') output += this.value.compileVm(symbolTable, isMethod);
 
         if (this.operator === '-') output += 'neg\n';
         else if (this.operator === '~') output += 'not\n';
